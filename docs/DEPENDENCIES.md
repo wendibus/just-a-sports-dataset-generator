@@ -1,6 +1,6 @@
 # Dependencies and asset provenance
 
-The application runs locally without fees, subscriptions, hosted inference, or model downloads. Installation obtains ordinary open-source Python packages; dataset processing does not contact a service.
+The application runs locally without fees, subscriptions, or hosted inference. Installation obtains ordinary open-source Python packages; dataset processing does not contact a service. The optional photorealistic repaint step downloads model weights only after the user approves an itemized plan (see below).
 
 The export milestone was checked with these distributions on macOS, Python 3.12. License identifiers below come from the installed package metadata. Keep the relevant license notices when distributing packages; Apache-2.0 for this repository does not replace third-party terms.
 
@@ -22,3 +22,27 @@ RF-DETR is the target training framework in Reco Trainer. Dataset generation its
 Reco Trainer is fetched only for the explicit CI compatibility test (or supplied as a local checkout). It is not bundled, modified, imported by the application, or used as a hosted service. The tests execute its existing local COCO importer and RF-DETR dataset builder against temporary synthetic data.
 
 The Mac bundle inventories Python, Pillow and bundled image libraries, OpenSSL, mpdecimal, and the Blender worker, retaining their notices under Lizenzen. Future photorealistic asset packs require separate source, license, redistribution, and no-cost checks before adoption. No downloaded asset pack is approved by this milestone.
+
+## Optional: local Qwen-Image-Edit-2511 (pose-guided repaint)
+
+`setup-qwen`, `generate-crops` and `repaint` install this runtime on first use, and only
+after showing the exact files, sizes, commits and licenses resolved live from the
+Hugging Face API and receiving explicit approval (interactive `j`, or `--yes`). Nothing is
+fetched in the background, and a component that reports a license other than Apache-2.0
+is refused. Every file is checked against the SHA-256 (large files) or Git blob SHA-1
+(small files) published by Hugging Face; the install manifest, written last, records
+commits, sizes and checksums, and each generation run copies it into `generation.json`.
+The runtime lives in its own Python environment under the user data folder (macOS:
+`~/Library/Application Support/JustASportsDatasetGenerator/qwen`) and is never bundled.
+
+| Component | Source | Purpose | License |
+| --- | --- | --- | --- |
+| Qwen-Image-Edit-2511 (text encoder, VAE, tokenizer, configs) | `Qwen/Qwen-Image-Edit-2511` | Image editing model, components except the transformer weights | Apache-2.0 |
+| Qwen-Image-Edit-2511 GGUF, default Q4_K_M (12.8 GB) | `unsloth/Qwen-Image-Edit-2511-GGUF` | Quantized image transformer that fits a 48 GB Mac | Apache-2.0 |
+| Qwen-Image-Edit-2511-Lightning 4-step LoRA (bf16) | `lightx2v/Qwen-Image-Edit-2511-Lightning` | 4-step distillation, about 10× fewer steps | Apache-2.0 |
+| torch 2.9.1, diffusers 0.36.0, transformers 4.57.3, accelerate 1.12.0, peft 0.18.0, gguf 0.17.1, safetensors 0.7.0, huggingface-hub 0.36.0 | PyPI | Runtime in the isolated environment; pinned to a combination reported working for GGUF Qwen-Image-Edit-2511 in diffusers | BSD-3-Clause (torch), Apache-2.0 (diffusers, transformers, accelerate, peft, safetensors, huggingface-hub), MIT (gguf) |
+
+Qwen-Image 2.1 was considered and rejected: its Qwen Research License permits
+non-commercial use only, which does not meet the "free to use for the intended workflow"
+requirement. Generated pixels replace only the appearance of rendered people; labels stay
+the renderer's ground truth (see [POSE_CROPS.md](POSE_CROPS.md)).

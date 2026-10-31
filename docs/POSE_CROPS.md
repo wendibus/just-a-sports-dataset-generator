@@ -2,9 +2,9 @@
 
 The procedural athletes are visibly synthetic. The intended upgrade path keeps Blender
 as the source of truth for geometry and labels and lets a local, pose-conditioned image
-model (for example Qwen-Image with a pose ControlNet, run in ComfyUI) repaint only the
-people. This document covers the crops the generator provides and the paste-back step. The
-generation itself runs in a tool of your choice on your own machine.
+model repaint only the people. The generator ships a local Qwen-Image-Edit-2511 runtime
+that it installs on first use, after asking; any other local tool can produce the same
+results.
 
 ## Outputs
 
@@ -41,7 +41,41 @@ frame, instance ID, visible box, the crop box in source pixels and the scale (cr
 pixels per source pixel), so a generated crop can be resized by `1 / scale` and pasted
 back at `crop_box_xyxy`.
 
-## Generating
+## One command
+
+```sh
+sports-dataset repaint outputs/reco --output outputs/reco-repaint
+sports-dataset export outputs/reco-repaint/render --output outputs/dataset
+```
+
+`repaint` writes `crops/`, `generated/` and the composited `render/` into the output
+folder. If Qwen is not installed yet, it first prints the download plan (files, sizes,
+commits, licenses, destination, about 31 GB in total) and asks `[j/N]`; `--yes` approves
+it non-interactively, `sports-dataset setup-qwen` installs ahead of time and
+`sports-dataset qwen-status` reports the install. An interrupted generation resumes when
+the same command is run again; finished people are skipped.
+
+## Generating with the built-in Qwen
+
+`generate-crops CROPS --output GENERATED` repaints each crop with Qwen-Image-Edit-2511
+(GGUF `--quant`, default Q4_K_M) and the 4-step Lightning LoRA. The model receives the
+RGB crop and the pose skeleton as two input images and a built-in prompt (player or
+referee) asking for a photorealistic person in exactly that pose, position and size,
+with the original kit colours; `--prompt` replaces it. Seeds are derived from `--seed`
+and the crop ID, so a rerun reproduces a crop. `--device auto` uses Apple Metal (MPS),
+then CUDA, then CPU. If the Lightning LoRA cannot be applied to the quantized model, the
+run falls back to 30 steps with classifier-free guidance and says so.
+
+`generation.json` records the model, quantization, packages, checksums and settings;
+`generation.jsonl` adds seed, steps and time per person; `qwen.log` keeps the worker
+output.
+
+Expect roughly 30 GB of memory use and one to a few minutes per person on an Apple
+M-series Mac with 48 GB; these figures come from public reports for the same model, not
+from measurements in this project. The end-to-end run on real weights has not been
+verified yet; the code path is tested with a stand-in runtime.
+
+## Using another tool
 
 Feed each crop to a local inpainting workflow: `rgb.png` as the image, `inpaint.png` as
 the mask and `pose.png` into a pose ControlNet. Save the result as `<crop id>.png`
@@ -49,8 +83,6 @@ the mask and `pose.png` into a pose ControlNet. Save the result as `<crop id>.pn
 Results must be square; they are resized to the crop size. Record the model and
 workflow with `--generator`; any model must meet the project rules: local, offline
 after setup, and with a license recorded in [DEPENDENCIES.md](DEPENDENCIES.md).
-
-No ComfyUI workflow ships yet, and none has been validated against this format.
 
 ## Pasting back
 

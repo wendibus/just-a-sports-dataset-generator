@@ -11,7 +11,10 @@ a = Analysis(
            (str(root / "licenses"), "Lizenzen"),
            (str(root / "LICENSE"), "Lizenzen"),
            (str(root / "src/just_a_sports_dataset_generator/renderers/blender_worker/basketball.py"),
-            "just_a_sports_dataset_generator/renderers/blender_worker")],
+            "just_a_sports_dataset_generator/renderers/blender_worker"),
+           # Run by the separate Qwen runtime as a file, so it must ship outside the archive.
+           (str(root / "src/just_a_sports_dataset_generator/generators/qwen_worker.py"),
+            "just_a_sports_dataset_generator/generators")],
     excludes=["numpy", "tkinter", "pycocotools"],
 )
 pyz = PYZ(a.pure)

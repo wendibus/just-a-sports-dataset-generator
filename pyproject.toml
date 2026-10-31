@@ -30,7 +30,10 @@ target-version = "py311"
 
 [tool.pyright]
 include = ["src"]
-exclude = ["src/just_a_sports_dataset_generator/renderers/blender_worker"]
+exclude = [
+  "src/just_a_sports_dataset_generator/renderers/blender_worker",
+  "src/just_a_sports_dataset_generator/generators/qwen_worker.py",
+]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 
