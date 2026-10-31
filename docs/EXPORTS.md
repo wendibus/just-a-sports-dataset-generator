@@ -28,7 +28,7 @@ Boxes use visible pixels, top-left `x,y,width,height`, and exclusive right/botto
 
 COCO uses category IDs starting at **1**, visible pixel boxes, `iscrowd=0`, and uncompressed column-major RLE instance masks. Native `class_id` values start at **0**. Both follow Reco's exact label order; the manifest records the relationship explicitly. The exported `coco/train`, `coco/valid`, and `coco/test` folders follow the [RF-DETR dataset layout](https://rfdetr.roboflow.com/learn/train/#dataset-structure). Background-only images stay in the image list with no annotation rows.
 
-Image/mask dimensions, mask mode, instance identities, class names/order, frame IDs, and file paths are checked. Paths cannot escape the scene folder. Current limits are 16,777,216 pixels, 32 MiB per scene/run JSON, and 255 distinct foreground instance IDs per frame. There are no poses, track continuity guarantees, depth exports, or photorealistic images in this milestone.
+Image/mask dimensions, mask mode, instance identities, class names/order, frame IDs, and file paths are checked. Paths cannot escape the scene folder. Current limits are 16,777,216 pixels, 32 MiB per scene/run JSON, and 255 distinct foreground instance IDs per frame. The export contains detection boxes and instance masks only: OpenPose keypoints stay in the render folder (`poses.json`), and there are no track continuity guarantees or depth exports. The 255-instance limit counts labeled objects only; spectators are background (see ARCHITECTURE.md).
 
 ## Splits and repeatability
 

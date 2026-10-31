@@ -29,6 +29,22 @@ The reference renderer is a pipeline test fixture. Version 0.4 adds a local Blen
 
 Reco's importer does not preserve dataset splits and currently imports detection boxes only. See [EXPORTS.md](EXPORTS.md). This milestone does not establish photorealism or training accuracy.
 
+## Completed since 0.4
+
+- `reco_panorama` camera preset approximating Reco's stitched full-court view
+  ([BASKETBALL.md](BASKETBALL.md#camera-presets)).
+- OpenPose keypoints per person, person crops, label-preserving paste-back and a
+  consent-based local Qwen-Image-Edit-2511 repaint ([POSE_CROPS.md](POSE_CROPS.md)).
+
+Still open, in order of value:
+
+1. Verify the Qwen repaint and the panorama geometry on real hardware and real Reco frames.
+2. Measure training value: RF-DETR trained on real labels only versus real plus synthetic,
+   evaluated on a held-out set of real games.
+3. Scene diversity: formations over the whole court, ball states, pose variety, halls,
+   lighting, spectators, motion between frames.
+4. Mac app: own Python runtime for Qwen, cancel and resume.
+
 Before releasing each sport milestone, compare the taxonomy with the upstream Reco Trainer source and record the checked revision. Any upstream change requires an explicit compatibility update.
 
 ## Basketball: first usable sport
@@ -42,7 +58,7 @@ acceptance criteria below. See [BASKETBALL.md](BASKETBALL.md).
 - Generate realistic images and annotations from the same scene and visibility information.
 - Verify image quality on representative basketball scenes and confirm imports in Reco Trainer.
 - Provide a graphical interface for scene preview, generation settings, progress, and exports.
-- Measure runtime and memory on the target Mac. Chip and memory capacity still need to be established before setting performance expectations.
+- Measure runtime and memory on the reference Mac (Apple M4 Pro, 48 GB; Blender 5.0.1 checked). Systematic measurements per quality setting and for the Qwen repaint are still open.
 - Demonstrate an end-to-end generation/export run with networking unavailable after setup.
 
 ## Football/soccer: second sport

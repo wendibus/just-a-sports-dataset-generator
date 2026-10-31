@@ -80,23 +80,28 @@ These eight IDs are recognized by the planner. Sport-specific photorealistic ren
 
 Updates are distributed through signed GitHub Releases manifests. The updater verifies signatures and SHA-256 hashes, checks operating-system, architecture, application API, plugin API, schema, and model compatibility, installs atomically, and retains the last known-good version for rollback.
 
-## Proposed repository layout
+## Repository layout
 
 ```text
-src/
-  core/          # domain model and application services
+src/just_a_sports_dataset_generator/
+  core/          # domain model and Reco Trainer taxonomy
   scenario/      # recipe parsing and deterministic job expansion
-  annotations/   # ground-truth generation and validation
-  exporters/     # COCO for RF-DETR and native annotations
-  plugins/       # plugin contracts and discovery
-  updater/       # signed manifests, compatibility, atomic installs
+  annotations/   # visible-pixel annotations, keypoints, handoff validation
+  exporters/     # COCO for RF-DETR, native annotations, provenance
+  renderers/     # reference fixture, Blender adapter, GPL Blender worker
+  generators/    # consent-based local Qwen runtime and its worker
+  plugins/       # plugin metadata contracts (discovery not implemented)
   cli/           # command-line interface
-  desktop/       # desktop application shell
+  crops.py, composite.py, preview.py
+macos/           # Mac starter and PyInstaller spec
 schemas/         # versioned JSON schemas
-plugins/         # first-party sport and backend plugins
-tests/           # unit, contract, integration, and golden-data tests
+examples/        # recipes
+tests/           # unit, contract and integration tests
 docs/            # user and developer documentation
 ```
+
+The signed updater and a cross-platform desktop shell are specified in
+[ARCHITECTURE.md](ARCHITECTURE.md) but not implemented.
 
 ## Development principles
 
@@ -136,7 +141,7 @@ sports-dataset preview outputs/dataset --output outputs/Vorschau
 
 The reference renderer writes geometric RGB and instance-ID images. Export derives boxes and COCO masks from visible pixels, converts RGB to PNG, and writes native annotations, whole-scene splits, checksums, and provenance. Existing render/export folders are never overwritten; use a new output folder for each run. The renderer supports boxes and instance masks; other requested passes fail explicitly.
 
-These rectangle images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. Use `render-basketball` for the new 3D scenes. The next work is improving athlete realism, pose diversity, camera controls, and validating training quality.
+These rectangle images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. Use `render-basketball` for the 3D scenes. Open work is tracked in [docs/ROADMAP.md](docs/ROADMAP.md); the most important open question is whether the synthetic data improves RF-DETR on real footage.
 
 Open `outputs/Vorschau/index.html` to compare the actual RGB images with colored object masks offline. Raw files named `*.instances.png` store small numeric object IDs and naturally look almost black in an image viewer; they are not the training photographs. The preview never changes these IDs or the COCO dataset. The Mac starter offers **Bilder ansehen** after generation and opens the training-image folder separately.
 
