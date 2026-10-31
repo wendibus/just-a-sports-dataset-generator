@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wendibus/just-a-sports-dataset-generator/schemas/poses-v1.0.json",
+  "title": "Per-scene 2D body keypoints (OpenPose BODY_18)",
+  "description": "Projected from scene geometry. v: 0 outside the image, 1 inside but occluded (by another object or, for face points, the person's own head), 2 visible.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job_id",
+    "format",
+    "keypoint_names",
+    "coordinates",
+    "resolution",
+    "frames"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "format": {
+      "const": "openpose-18"
+    },
+    "keypoint_names": {
+      "const": [
+        "nose",
+        "neck",
+        "right_shoulder",
+        "right_elbow",
+        "right_wrist",
+        "left_shoulder",
+        "left_elbow",
+        "left_wrist",
+        "right_hip",
+        "right_knee",
+        "right_ankle",
+        "left_hip",
+        "left_knee",
+        "left_ankle",
+        "right_eye",
+        "left_eye",
+        "right_ear",
+        "left_ear"
+      ]
+    },
+    "coordinates": {
+      "type": "string"
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "frame_index",
+          "people"
+        ],
+        "properties": {
+          "frame_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "instance_id",
+                "label",
+                "keypoints"
+              ],
+              "properties": {
+                "instance_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "label": {
+                  "enum": [
+                    "player",
+                    "goalkeeper",
+                    "referee"
+                  ]
+                },
+                "keypoints": {
+                  "type": "array",
+                  "minItems": 18,
+                  "maxItems": 18,
+                  "items": {
+                    "type": "array",
+                    "prefixItems": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "enum": [
+                          0,
+                          1,
+                          2
+                        ]
+                      }
+                    ],
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

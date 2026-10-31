@@ -12,6 +12,7 @@ from PIL import Image
 
 from just_a_sports_dataset_generator.annotations import AnnotationError
 from just_a_sports_dataset_generator.core import SceneJob, labels_for_sport
+from just_a_sports_dataset_generator.crops import export_crops
 from just_a_sports_dataset_generator.exporters import export_dataset
 from just_a_sports_dataset_generator.renderers.blender import (
     BlenderBasketballRenderer,
@@ -164,3 +165,11 @@ class BlenderIntegrationTests(unittest.TestCase):
                 x, y = camera["ball_pixel"]
                 self.assertEqual(mask.getpixel((round(x), round(y))), 1)
             self.assertGreater(export_dataset(root / "render", root / "dataset").annotations, 10)
+            poses = json.loads((result.output_directory / "poses.json").read_text())
+            people = poses["frames"][0]["people"]
+            self.assertEqual({p["instance_id"] for p in people}, set(range(10, 20)) | {30})
+            # Body joints project onto the rendered athletes, not beside them.
+            well_seen = [p for p in people if sum(k[2] == 2 for k in p["keypoints"][1:14]) >= 9]
+            self.assertGreaterEqual(len(well_seen), 7)
+            crops = export_crops(root / "render", root / "crops", size=256)
+            self.assertGreaterEqual(crops.crops, 8)

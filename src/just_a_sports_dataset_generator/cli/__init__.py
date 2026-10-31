@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from just_a_sports_dataset_generator import __version__
+from just_a_sports_dataset_generator.crops import export_crops
 from just_a_sports_dataset_generator.exporters import LocalDatasetExporter
 from just_a_sports_dataset_generator.preview import create_preview
 from just_a_sports_dataset_generator.renderers import ReferenceRenderer
@@ -46,6 +47,15 @@ def _parser() -> argparse.ArgumentParser:
     export.add_argument("source", type=Path)
     export.add_argument("--output", "-o", type=Path, required=True)
     export.add_argument("--format", choices=("coco",), default="coco")
+    crops = subcommands.add_parser(
+        "export-crops", help="write per-person RGB/mask/pose crops for pose-guided inpainting"
+    )
+    crops.add_argument("source", type=Path)
+    crops.add_argument("--output", "-o", type=Path, required=True)
+    crops.add_argument("--size", type=int, default=1024)
+    crops.add_argument("--margin", type=float, default=0.25)
+    crops.add_argument("--min-height", type=int, default=24)
+    crops.add_argument("--dilate", type=int, default=9)
     preview = subcommands.add_parser(
         "preview", help="write an offline RGB and colored-mask preview"
     )
@@ -58,6 +68,15 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
     if args.command == "preview":
         index = create_preview(args.source, args.output)
         print(f"preview: {index}")
+        return 0
+    if args.command == "export-crops":
+        result = export_crops(
+            args.source, args.output, args.size, args.margin, args.min_height, args.dilate
+        )
+        print(
+            f"wrote {result.crops} person crops to {args.output} "
+            f"({result.skipped_small} smaller than {args.min_height} px skipped)"
+        )
         return 0
     if args.command == "export":
         formats = (str(args.format),)

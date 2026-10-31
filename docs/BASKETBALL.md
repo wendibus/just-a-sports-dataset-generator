@@ -71,6 +71,8 @@ convention (forward −Z, right +X, up +Y) was verified against rendered markers
 - RGB is antialiased and denoised; Object Index is not antialiased. Subpixel edges
   can differ by about a pixel. Motion blur and transparent backboards are disabled;
   the current opaque practice backboard avoids ambiguous transparent-object masks.
+- `poses.json` holds OpenPose BODY_18 keypoints per person and frame with COCO
+  visibility; see [pose crops](POSE_CROPS.md).
 - Occluded/off-camera objects keep identities but produce no visible boxes.
   Exported COCO categories are one-based; native class IDs remain zero-based.
 - Native/scene/export schemas remain unchanged. `worker-result.json` is a
