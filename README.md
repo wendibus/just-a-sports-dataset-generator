@@ -7,10 +7,25 @@ Cross-platform, open-source generator for photorealistic synthetic sports datase
 ## Goals
 
 - Generate diverse, photorealistic sports scenes on Windows, macOS, and Linux.
+- Run the complete workflow locally with freely available components and no paid services.
 - Export images together with deterministic, machine-readable ground truth.
 - Support detection, segmentation, pose estimation, tracking, and event-recognition workflows.
 - Keep render engines, sports, annotation exporters, and models replaceable through plugins.
 - Make every dataset reproducible from a versioned configuration, seed, and asset manifest.
+
+## Product scope and sport order
+
+macOS is the primary development and validation platform. The first usable version will include a graphical interface with scene preview, generation progress, and export controls.
+
+Sport implementations will be completed in this order:
+
+1. Basketball (`basketball`)
+2. Football / soccer (`football`)
+3. Futsal (`futsal`)
+
+All rendering, model execution, annotation, validation, and export must run on the user's own computer. Components and assets must be free to obtain and use under licenses suitable for this workflow. Hosted image services, cloud rendering, paid APIs, subscriptions, and credit-based generation are outside the project scope.
+
+After setup, generation must work offline. Initial component downloads and the planned application/plugin updater may use the network; models and large assets still require explicit download consent. The detailed milestones and acceptance criteria are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Planned capabilities
 
@@ -18,7 +33,7 @@ Cross-platform, open-source generator for photorealistic synthetic sports datase
 - Domain randomization plus scenario presets for controlled experiments.
 - Automatic annotations: bounding boxes, instance/semantic masks, keypoints, depth, optical flow, object IDs, camera calibration, and scene metadata.
 - Dataset exports for COCO, YOLO, MOT, and a native lossless scene format.
-- Local-first generation with optional external render or model backends.
+- Fully local generation with replaceable local render and model backends.
 - Validation reports for class balance, occlusion, annotation integrity, and train/validation/test leakage.
 
 ## Architecture
@@ -48,6 +63,8 @@ Every run should record:
 ## Reco Trainer compatibility
 
 Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Compatibility tests lock this mapping so taxonomy drift is detected before release.
+
+These eight IDs are recognized by the planner. Sport-specific photorealistic rendering is still planned and will follow the implementation order above.
 
 ## Update policy
 

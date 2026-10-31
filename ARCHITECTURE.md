@@ -2,7 +2,13 @@
 
 ## 1. System context
 
-Just a Sports Dataset Generator turns a versioned dataset recipe into rendered media, automatic annotations, validation reports, and a provenance manifest. The core must run on Windows, macOS, and Linux while external render engines and models remain replaceable adapters.
+Just a Sports Dataset Generator turns a versioned dataset recipe into rendered media, automatic annotations, validation reports, and a provenance manifest. The core must run on Windows, macOS, and Linux while locally installed render engines and models remain replaceable adapters. macOS is the primary development and acceptance-test platform.
+
+### Product constraints
+
+All generation, rendering, model execution, annotation, validation, preview, and export run locally and must work offline after setup. Use only components, weights, and assets that are free to obtain and use for this workflow, with documented license and distribution terms. Hosted image generation, cloud compute, paid APIs, subscriptions, and credit-based backends are excluded, including optional integrations.
+
+The first usable basketball version includes a graphical interface with preview. Complete sport implementations in order: basketball, football/soccer, then futsal. Their canonical Reco Trainer IDs are `basketball`, `football`, and `futsal`; label spelling and ordering follow Reco Trainer.
 
 ## 2. Core pipeline
 
@@ -30,7 +36,7 @@ Exporters write COCO, YOLO, MOT, or the native lossless format. A run manifest r
 
 ## 3. Plugin model
 
-Plugin types include sports, render backends, asset providers, motion generators, annotation exporters, and optional model integrations. Every plugin ships metadata containing:
+Plugin types include sports, local render backends, local asset providers, motion generators, annotation exporters, and local model integrations. Plugins must satisfy the same offline operation and no-cost requirements as the core; there is no hosted-service fallback. Every plugin ships metadata containing:
 
 - plugin ID and semantic version;
 - plugin API version range;
@@ -106,13 +112,15 @@ Plugin updates use the same signature, hash, staging, compatibility, health-chec
 
 Models are never downloaded automatically. The UI may report that an optional or required model is available, but installation requires explicit consent with size, license, source, version, and compatibility shown beforehand. Model artifacts are hashed and recorded in dataset provenance.
 
+Network access for initial component installation and updates is separate from dataset processing. Once required components are installed, an offline or unavailable update service must not prevent generation. User images, recipes, and datasets are never uploaded to a processing service.
+
 ## 6. Failure handling and observability
 
 Operations emit structured local events without secrets or user dataset contents. Each job and update has a correlation ID. Interrupted generation resumes from completed immutable jobs. Update failures retain the previous version, a sanitized log, and a human-readable recovery action.
 
 ## 7. Security boundaries
 
-Treat recipes, assets, plugins, manifests, archives, model files, and dataset paths as untrusted input. Apply schema and size limits, safe archive extraction, canonical paths, least privilege, network allowlists for updater endpoints, and explicit consent for external services. Secrets belong in platform credential storage, never recipes or manifests.
+Treat recipes, assets, plugins, manifests, archives, model files, and dataset paths as untrusted input. Apply schema and size limits, safe archive extraction, canonical paths, least privilege, and network allowlists for download/updater endpoints. Generation and export must not depend on network access. Secrets belong in platform credential storage, never recipes or manifests.
 
 ## 8. Testing strategy
 
@@ -128,7 +136,10 @@ Treat recipes, assets, plugins, manifests, archives, model files, and dataset pa
 
 1. Versioned recipe schema, normalized domain model, deterministic planner, and CLI.
 2. Minimal reference renderer adapter with RGB and instance-ID output.
-3. Native annotation model, COCO exporter, validators, and provenance manifest.
-4. Plugin API and one sport reference plugin.
-5. Desktop shell and job monitoring.
-6. Signed release manifest tooling, compatibility resolver, atomic updater, and rollback.
+3. Native annotation model, COCO/YOLO exporters, validators, and provenance manifest; verify imports in Reco Trainer.
+4. Local basketball scene generation with freely usable assets, realistic rendering, and visibility-correct ground truth.
+5. First usable basketball application on macOS with a graphical interface, preview, and job monitoring.
+6. Football/soccer implementation, followed by futsal, using the same local pipeline and Reco Trainer conventions.
+7. Signed release manifest tooling, compatibility resolver, atomic updater, and rollback for distributing local application/plugin updates.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for completion criteria and the distinction between the existing test backend and planned usable sport implementations.

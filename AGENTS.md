@@ -10,6 +10,19 @@ Build a cross-platform, open-source system that generates photorealistic synthet
 
 The project is in architecture/bootstrap phase. Do not present planned functionality as implemented. Keep README status statements accurate as code lands.
 
+## Confirmed product requirements
+
+- All generation, rendering, annotation, validation, preview, and export must run locally on the user's computer and work offline after setup.
+- Use components, model weights, and assets that are free to obtain and use for the intended workflow. No paid APIs, subscriptions, credits, hosted inference, or cloud rendering, including optional integrations such as Kling AI.
+- Check and document each dependency's and asset's license for its intended use and distribution; free download alone is not sufficient.
+- macOS is the primary development and acceptance-test platform. Keep the core cross-platform; do not assume a particular Mac chip or memory capacity.
+- Deliver a graphical interface with preview in the first usable basketball version.
+- Complete sport implementations in this order: basketball (`basketball`), football/soccer (`football`), then futsal (`futsal`). Other Reco Trainer sport IDs remain in the taxonomy for later work.
+- Preserve Reco Trainer sport IDs, label names, and class ordering. Taxonomy availability does not imply a completed sport renderer.
+- Prioritize correctness, realistic output, and verified Reco Trainer imports over turnaround speed.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and acceptance criteria.
+
 ## Engineering rules
 
 - Target Python 3.11+ for orchestration and data tooling.
