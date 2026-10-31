@@ -22,7 +22,7 @@ from just_a_sports_dataset_generator.annotations.scene import (
     sequence,
     string,
 )
-from just_a_sports_dataset_generator.core import SceneJob, labels_for_sport
+from just_a_sports_dataset_generator.core import CAMERA_PRESETS, SceneJob, labels_for_sport
 from just_a_sports_dataset_generator.plugins import PLUGIN_API_VERSION, PluginMetadata
 from just_a_sports_dataset_generator.storage import new_directory, sha256_file, write_json
 
@@ -92,6 +92,8 @@ class BlenderBasketballRenderer:
             raise ValueError("scene seed must be a non-negative integer")
         if job.width * job.height > MAX_PIXELS:
             raise ValueError("renderer is limited to 16 megapixels")
+        if job.camera not in CAMERA_PRESETS:
+            raise ValueError(f"camera must be one of: {', '.join(CAMERA_PRESETS)}")
         if set(job.annotations) - {"bounding_boxes", "instance_masks"}:
             raise ValueError("basketball backend supports bounding_boxes and instance_masks")
         if max_frames is not None and (type(max_frames) is not int or max_frames < 1):

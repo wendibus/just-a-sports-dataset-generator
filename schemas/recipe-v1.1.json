@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wendibus/just-a-sports-dataset-generator/schemas/recipe-v1.1.json",
+  "title": "Sports dataset recipe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "name",
+    "sport",
+    "seed",
+    "scenes",
+    "frames_per_scene",
+    "resolution",
+    "annotations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.1"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sport": {
+      "enum": [
+        "basketball",
+        "football",
+        "futsal",
+        "handball",
+        "hockey",
+        "rugby",
+        "lacrosse",
+        "american_football"
+      ]
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scenes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "frames_per_scene": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "bounding_boxes",
+          "instance_masks",
+          "semantic_masks",
+          "keypoints",
+          "depth"
+        ]
+      }
+    },
+    "camera": {
+      "enum": [
+        "broadcast",
+        "reco_panorama"
+      ],
+      "default": "broadcast",
+      "description": "broadcast: elevated sideline perspective camera. reco_panorama: equirectangular full-court panorama from a low sideline mount, approximating a stitched Reco panorama."
+    }
+  }
+}

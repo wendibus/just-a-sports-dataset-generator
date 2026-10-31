@@ -42,6 +42,38 @@ class PlannerTests(unittest.TestCase):
             with self.assertRaisesRegex(RecipeError, "unsupported annotations"):
                 load_recipe(path)
 
+    def _write(self, directory: str, data: dict[str, object]) -> Path:
+        path = Path(directory) / "recipe.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
+
+    def test_reco_panorama_camera_reaches_every_job(self) -> None:
+        recipe = load_recipe(self.recipe_path.with_name("basketball-reco.json"))
+        self.assertEqual(recipe.schema_version, "1.1")
+        self.assertEqual(recipe.camera, "reco_panorama")
+        self.assertTrue(all(job.camera == "reco_panorama" for job in plan_jobs(recipe)))
+
+    def test_camera_defaults_to_broadcast(self) -> None:
+        self.assertEqual(load_recipe(self.recipe_path).camera, "broadcast")
+        data = json.loads(self.recipe_path.read_text(encoding="utf-8"))
+        data["schema_version"] = "1.1"
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(load_recipe(self._write(directory, data)).camera, "broadcast")
+
+    def test_camera_requires_schema_1_1_and_a_known_preset(self) -> None:
+        data = json.loads(self.recipe_path.read_text(encoding="utf-8"))
+        data["camera"] = "reco_panorama"
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(RecipeError, "unknown fields: camera"):
+                load_recipe(self._write(directory, data))
+            data["schema_version"] = "1.1"
+            data["camera"] = "drone"
+            with self.assertRaisesRegex(RecipeError, "camera must be one of"):
+                load_recipe(self._write(directory, data))
+            data["schema_version"] = "2.0"
+            with self.assertRaisesRegex(RecipeError, "unsupported schema_version"):
+                load_recipe(self._write(directory, data))
+
     def test_taxonomy_matches_reco_trainer_class_order(self) -> None:
         expected = {
             "basketball": ("ball", "player", "referee", "hoop"),

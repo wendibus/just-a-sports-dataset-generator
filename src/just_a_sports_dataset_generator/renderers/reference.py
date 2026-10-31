@@ -76,6 +76,8 @@ class ReferenceRenderer:
             raise ValueError("invalid scene job ID")
         if job.labels != labels_for_sport(job.sport):
             raise ValueError("job label order differs from Reco Trainer")
+        if job.camera != "broadcast":
+            raise ValueError("the geometric reference renderer has no camera presets")
         for value in (job.width, job.height, job.frame_count):
             if type(value) is not int or value < 1:
                 raise ValueError("dimensions and frame count must be positive integers")

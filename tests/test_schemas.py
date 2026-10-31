@@ -44,7 +44,7 @@ class SchemaTests(unittest.TestCase):
                     main(["export", str(root / "render"), "--output", str(root / "dataset")]), 0
                 )
             cases = {
-                "render-run-v1.0": root / "render/run.json",
+                "render-run-v1.1": root / "render/run.json",
                 "scene-v2.0": root / "render/scene-000000/scene.json",
                 "native-annotations-v1.0": root / "dataset/native/scene-000000/annotations.json",
                 "export-manifest-v2.0": root / "dataset/manifest.json",
@@ -53,3 +53,10 @@ class SchemaTests(unittest.TestCase):
             for name, path in cases.items():
                 with self.subTest(schema=name):
                     schemas[name].validate(read_json(path))
+
+    def test_examples_follow_their_recipe_schema(self):
+        for path in sorted((ROOT / "examples").glob("*.json")):
+            recipe = read_json(path)
+            schema = read_json(ROOT / f"schemas/recipe-v{recipe['schema_version']}.json")
+            with self.subTest(example=path.name):
+                Draft202012Validator(schema).validate(recipe)

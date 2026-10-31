@@ -5,9 +5,16 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from just_a_sports_dataset_generator.core import SPORTS, DatasetRecipe, SceneJob, labels_for_sport
+from just_a_sports_dataset_generator.core import (
+    CAMERA_PRESETS,
+    SPORTS,
+    DatasetRecipe,
+    SceneJob,
+    labels_for_sport,
+)
 
-SUPPORTED_SCHEMA_VERSION = "1.0"
+SUPPORTED_SCHEMA_VERSIONS = ("1.0", "1.1")
+"""1.1 adds the optional ``camera`` preset; 1.0 recipes keep the broadcast camera."""
 SUPPORTED_ANNOTATIONS = frozenset(
     {"bounding_boxes", "instance_masks", "semantic_masks", "keypoints", "depth"}
 )
@@ -43,14 +50,19 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
         "resolution",
         "annotations",
     }
+    if raw.get("schema_version") not in SUPPORTED_SCHEMA_VERSIONS:
+        raise RecipeError(f"unsupported schema_version: {raw.get('schema_version')!r}")
+    schema_version = cast(str, raw["schema_version"])
+    optional = {"camera"} if schema_version == "1.1" else set[str]()
     missing = sorted(required - raw.keys())
-    unknown = sorted(raw.keys() - required)
+    unknown = sorted(raw.keys() - required - optional)
     if missing:
         raise RecipeError(f"missing fields: {', '.join(missing)}")
     if unknown:
         raise RecipeError(f"unknown fields: {', '.join(unknown)}")
-    if raw["schema_version"] != SUPPORTED_SCHEMA_VERSION:
-        raise RecipeError(f"unsupported schema_version: {raw['schema_version']!r}")
+    camera = raw.get("camera", "broadcast")
+    if camera not in CAMERA_PRESETS:
+        raise RecipeError(f"camera must be one of: {', '.join(CAMERA_PRESETS)}")
     if not isinstance(raw["name"], str) or not raw["name"].strip():
         raise RecipeError("name must be a non-empty string")
     if not isinstance(raw["sport"], str) or not raw["sport"].strip():
@@ -79,7 +91,7 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
         raise RecipeError("annotations must not contain duplicates")
 
     return DatasetRecipe(
-        schema_version=SUPPORTED_SCHEMA_VERSION,
+        schema_version=schema_version,
         name=raw["name"].strip(),
         sport=sport,
         seed=raw["seed"],
@@ -89,6 +101,7 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
         height=_positive_int(resolution["height"], "resolution.height"),
         annotations=tuple(annotations),
         labels=labels_for_sport(sport),
+        camera=cast(str, camera),
     )
 
 
@@ -109,6 +122,7 @@ def plan_jobs(recipe: DatasetRecipe) -> tuple[SceneJob, ...]:
             height=recipe.height,
             annotations=recipe.annotations,
             labels=recipe.labels,
+            camera=recipe.camera,
         )
         for index in range(recipe.scenes)
     )

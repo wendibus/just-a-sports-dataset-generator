@@ -44,6 +44,7 @@ class BlenderAdapterTests(unittest.TestCase):
                 replace(job(), width=0),
                 replace(job(), seed=-1),
                 replace(job(), annotations=("depth",)),
+                replace(job(), camera="drone"),
             ):
                 with self.subTest(job=invalid), self.assertRaises(ValueError):
                     renderer.render(invalid, root)
@@ -142,3 +143,24 @@ class BlenderIntegrationTests(unittest.TestCase):
             x, y = details["cameras"][0]["ball_pixel"]
             with Image.open(result.output_directory / frame["instance_ids"]) as mask:
                 self.assertEqual(mask.getpixel((round(x), round(y))), 1)
+
+    def test_reco_panorama_scene_and_mask_alignment(self):
+        panorama = replace(job(), width=960, height=270, camera="reco_panorama")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = BlenderBasketballRenderer(
+                Path(os.environ["BLENDER_EXECUTABLE"]), samples=1
+            ).render(panorama, root / "render")
+            frame = json.loads(result.manifest.read_text())["frames"][0]
+            with Image.open(result.output_directory / frame["instance_ids"]) as mask:
+                ids = {value for _, value in mask.getcolors()}
+                details = json.loads((result.output_directory / "worker-result.json").read_text())
+                camera = details["cameras"][0]
+                self.assertEqual(camera["projection"], "equirectangular")
+                # The whole court is in view: both hoops, the referee and most players.
+                self.assertTrue({1, 30, 40, 41} <= ids)
+                self.assertGreaterEqual(len(ids & set(range(10, 20))), 8)
+                # Independent equirectangular projection lands on the rendered ball.
+                x, y = camera["ball_pixel"]
+                self.assertEqual(mask.getpixel((round(x), round(y))), 1)
+            self.assertGreater(export_dataset(root / "render", root / "dataset").annotations, 10)
