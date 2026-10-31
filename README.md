@@ -116,11 +116,14 @@ sports-dataset validate examples/basketball.json
 sports-dataset plan examples/basketball.json --output plan.json
 sports-dataset render-reference examples/basketball.json --output outputs/demo --max-frames 2
 sports-dataset export outputs/demo --output outputs/dataset
+sports-dataset preview outputs/dataset --output outputs/Vorschau
 ```
 
 The reference renderer writes geometric RGB and instance-ID images. Export derives boxes and COCO masks from visible pixels, converts RGB to PNG, and writes native annotations, whole-scene splits, checksums, and provenance. Existing render/export folders are never overwritten; use a new output folder for each run. The renderer supports boxes and instance masks; other requested passes fail explicitly.
 
 These geometric images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. The next milestone is local basketball scene generation, followed by the macOS interface with preview.
+
+Open `outputs/Vorschau/index.html` to compare the actual RGB images with colored object masks offline. Raw files named `*.instances.png` store small numeric object IDs and naturally look almost black in an image viewer; they are not the training photographs. The preview never changes these IDs or the COCO dataset. The Mac starter offers **Bilder ansehen** after generation and opens the training-image folder separately.
 
 For development, install `python -m pip install -e ".[dev]"`, then run `python -m unittest discover -s tests -v`, `ruff check .`, `ruff format --check src tests`, and `pyright`. The [export guide](docs/EXPORTS.md) describes the optional local Reco checkout needed for importer tests. CI runs that integration check automatically against the recorded revision. Dependencies and licenses are listed in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
 

@@ -8,6 +8,7 @@ Install Python 3.11+ and the package once. Rendering and export then work offlin
 python -m pip install -e .
 sports-dataset render-reference examples/basketball.json --output outputs/render --max-frames 2
 sports-dataset export outputs/render --output outputs/dataset
+sports-dataset preview outputs/dataset --output outputs/Vorschau
 ```
 
 Use a fresh output directory each time. Both commands publish a completed staging folder; errors do not leave a partial dataset at the requested destination. An existing output is an error, never an instruction to overwrite. Render resumption is not implemented yet. The exporter accepts a run directory or one scene directory. The export destination must be separate from the source, outside its directory tree.
@@ -15,6 +16,8 @@ Use a fresh output directory each time. Both commands publish a completed stagin
 COCO for RF-DETR is the only export format. `--format coco` is accepted but optional. The previous `--format yolo` and `--format both` options are rejected. Reference rendering currently supports only `bounding_boxes` and `instance_masks`; requested keypoints, semantic masks, or depth are rejected before publication.
 
 ## Files and annotation semantics
+
+For viewing, open `outputs/Vorschau/index.html`. It shows RGB images beside colored mask thumbnails, with links to the original images. It stays outside the training dataset and displays at most 48 frames. Raw `*.instances.png` masks encode object IDs (0 for background, 1..255 for objects), so small IDs appear almost black; do not brighten or otherwise modify the raw masks. The preview renders a separate color palette and preserves all training-file checksums.
 
 - `coco/{train,valid,test}/`: RGB PNGs and `_annotations.coco.json`.
 - `native/<scene>/`: lossless 8-bit instance-ID PNGs and `annotations.json`. RGB is referenced by image name and resides in the COCO folders.

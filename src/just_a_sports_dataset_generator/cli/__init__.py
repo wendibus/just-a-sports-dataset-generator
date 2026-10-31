@@ -9,6 +9,7 @@ from pathlib import Path
 
 from just_a_sports_dataset_generator import __version__
 from just_a_sports_dataset_generator.exporters import LocalDatasetExporter
+from just_a_sports_dataset_generator.preview import create_preview
 from just_a_sports_dataset_generator.renderers import ReferenceRenderer
 from just_a_sports_dataset_generator.scenario import load_recipe, plan_jobs
 from just_a_sports_dataset_generator.storage import new_directory, sha256_file, write_json
@@ -33,10 +34,19 @@ def _parser() -> argparse.ArgumentParser:
     export.add_argument("source", type=Path)
     export.add_argument("--output", "-o", type=Path, required=True)
     export.add_argument("--format", choices=("coco",), default="coco")
+    preview = subcommands.add_parser(
+        "preview", help="write an offline RGB and colored-mask preview"
+    )
+    preview.add_argument("source", type=Path)
+    preview.add_argument("--output", "-o", type=Path, required=True)
     return parser
 
 
 def _execute(args: argparse.Namespace) -> int:
+    if args.command == "preview":
+        index = create_preview(args.source, args.output)
+        print(f"preview: {index}")
+        return 0
     if args.command == "export":
         formats = (str(args.format),)
         result = LocalDatasetExporter().export(args.source, args.output, formats)
