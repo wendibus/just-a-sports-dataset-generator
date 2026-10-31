@@ -93,13 +93,11 @@ class BlenderAdapterTests(unittest.TestCase):
             )
             return subprocess.CompletedProcess(command, 0)
 
-        with (
-            tempfile.TemporaryDirectory() as directory,
-            patch("subprocess.run", side_effect=worker),
-        ):
+        with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             renderer = BlenderBasketballRenderer(Path(sys.executable))
-            rendered = renderer.render(job(), root / "render")
+            with patch("subprocess.run", side_effect=worker):
+                rendered = renderer.render(job(), root / "render")
             scene = json.loads(rendered.manifest.read_text())
             self.assertEqual(scene["frames"][0]["objects"][0]["bbox_xywh"], [12, 20, 6, 5])
             self.assertEqual(scene["frames"][0]["objects"][0]["visible_area"], 30)
