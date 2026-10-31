@@ -14,6 +14,7 @@ from pathlib import Path
 from PIL import Image
 
 from just_a_sports_dataset_generator.annotations import ObjectIdentity, visible_annotations
+from just_a_sports_dataset_generator.annotations.poses import OPENPOSE_18, frame_poses
 from just_a_sports_dataset_generator.annotations.scene import (
     MAX_PIXELS,
     integer,
@@ -153,6 +154,7 @@ class BlenderBasketballRenderer:
             if len(frames) != count:
                 raise ValueError("Blender returned an unexpected number of frames")
             validated: list[dict[str, object]] = []
+            poses: list[dict[str, object]] = []
             for expected_index, raw in enumerate(frames):
                 frame = mapping(raw)
                 if integer(frame.get("frame_index")) != expected_index:
@@ -178,12 +180,22 @@ class BlenderBasketballRenderer:
                         or mask.size != rgb.size
                     ):
                         raise ValueError("Blender passes have invalid dimensions or color modes")
+                    ids = mask.tobytes()
                     visible = {
                         item.instance_id: item
                         for item in visible_annotations(
-                            job.width, job.height, mask.tobytes(), tuple(objects), job.sport
+                            job.width, job.height, ids, tuple(objects), job.sport
                         )
                     }
+                    if "poses" in frame:
+                        poses.append(
+                            {
+                                "frame_index": expected_index,
+                                "people": frame_poses(
+                                    frame["poses"], objects, job.width, job.height, ids
+                                ),
+                            }
+                        )
                 validated.append(
                     {
                         "frame_index": expected_index,
@@ -202,6 +214,21 @@ class BlenderBasketballRenderer:
                             for obj in objects
                         ],
                     }
+                )
+            if poses:
+                if len(poses) != len(validated):
+                    raise ValueError("Blender returned poses for only some frames")
+                write_json(
+                    staging / "poses.json",
+                    {
+                        "schema_version": "1.0",
+                        "job_id": job.job_id,
+                        "format": "openpose-18",
+                        "keypoint_names": list(OPENPOSE_18),
+                        "coordinates": "pixel centres; v: 0 outside image, 1 occluded, 2 visible",
+                        "resolution": {"width": job.width, "height": job.height},
+                        "frames": poses,
+                    },
                 )
             write_json(
                 staging / "scene.json",

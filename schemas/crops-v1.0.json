@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wendibus/just-a-sports-dataset-generator/schemas/crops-v1.0.json",
+  "title": "Per-person crops for pose-guided inpainting",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "size",
+    "margin",
+    "min_height",
+    "dilate_px",
+    "pose_format",
+    "keypoint_names",
+    "note",
+    "crops"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 4096
+    },
+    "margin": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "min_height": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "dilate_px": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pose_format": {
+      "const": "openpose-18"
+    },
+    "keypoint_names": {
+      "const": [
+        "nose",
+        "neck",
+        "right_shoulder",
+        "right_elbow",
+        "right_wrist",
+        "left_shoulder",
+        "left_elbow",
+        "left_wrist",
+        "right_hip",
+        "right_knee",
+        "right_ankle",
+        "left_hip",
+        "left_knee",
+        "left_ankle",
+        "right_eye",
+        "left_eye",
+        "right_ear",
+        "left_ear"
+      ]
+    },
+    "note": {
+      "type": "string"
+    },
+    "crops": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "job_id",
+          "frame_index",
+          "instance_id",
+          "label",
+          "source_rgb",
+          "bbox_xywh",
+          "visible_area",
+          "crop_box_xyxy",
+          "scale",
+          "files",
+          "keypoints"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "frame_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "instance_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "label": {
+            "enum": [
+              "player",
+              "goalkeeper",
+              "referee"
+            ]
+          },
+          "source_rgb": {
+            "type": "string"
+          },
+          "bbox_xywh": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "visible_area": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "crop_box_xyxy": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "Square crop in source pixels; may extend past the image (padded black)."
+          },
+          "scale": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "crop pixels per source pixel"
+          },
+          "files": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rgb",
+              "mask",
+              "inpaint",
+              "pose"
+            ],
+            "properties": {
+              "rgb": {
+                "type": "string"
+              },
+              "mask": {
+                "type": "string"
+              },
+              "inpaint": {
+                "type": "string"
+              },
+              "pose": {
+                "type": "string"
+              }
+            }
+          },
+          "keypoints": {
+            "type": "array",
+            "minItems": 18,
+            "maxItems": 18,
+            "items": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    0,
+                    1,
+                    2
+                  ]
+                }
+              ],
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -302,7 +302,34 @@ def jersey_mesh(mat, identity, root):
         poly.use_smooth = True
 
 
+# OpenPose BODY_18 order, the format pose ControlNets expect.
+OPENPOSE_18 = (
+    "nose",
+    "neck",
+    "right_shoulder",
+    "right_elbow",
+    "right_wrist",
+    "left_shoulder",
+    "left_elbow",
+    "left_wrist",
+    "right_hip",
+    "right_knee",
+    "right_ankle",
+    "left_hip",
+    "left_knee",
+    "left_ankle",
+    "right_eye",
+    "left_eye",
+    "right_ear",
+    "left_ear",
+)
+# instance ID -> (root object, joint name -> local position). Athletes face local -Y,
+# so their right side is local -X (side == -1).
+SKELETONS = {}
+
+
 def athlete(identity, team, position, heading, pose, rng, number):
+    joints = {"nose": (0, -0.102, 1.80), "neck": (0, 0, 1.58)}
     root = bpy.data.objects.new("Referee" if team == 2 else f"Player {number}", None)
     bpy.context.collection.objects.link(root)
     root.location, root.rotation_euler.z = position, heading
@@ -366,6 +393,17 @@ def athlete(identity, team, position, heading, pose, rng, number):
         oval("Elbow", elbow, (0.061, 0.061, 0.061), skin, identity, root)
         limb("Forearm", elbow, hand, 0.061, 0.035, skin, identity, root)
         oval("Hand", hand, (0.050, 0.027, 0.077), skin, identity, root)
+        prefix = "right" if side == -1 else "left"
+        joints |= {
+            f"{prefix}_shoulder": shoulder,
+            f"{prefix}_elbow": elbow,
+            f"{prefix}_wrist": hand,
+            f"{prefix}_hip": hip,
+            f"{prefix}_knee": knee,
+            f"{prefix}_ankle": ankle,
+            f"{prefix}_eye": (side * 0.040, -0.092, 1.83),
+            f"{prefix}_ear": (side * 0.102, 0, 1.79),
+        }
         for finger in range(4):
             start = (hand[0] + (finger - 1.5) * 0.019, hand[1], hand[2] - 0.045)
             end = (start[0], start[1] - 0.012, start[2] - 0.055)
@@ -401,6 +439,7 @@ def athlete(identity, team, position, heading, pose, rng, number):
                 identity,
                 root,
             )
+    SKELETONS[identity] = (root, {name: joints[name] for name in OPENPOSE_18})
     return root
 
 
@@ -541,7 +580,9 @@ def project_pixel(scene, camera, point, width, height):
     """Pixel-centre coordinates of a world point for perspective or equirectangular cameras."""
     data = camera.data
     if data.type != "PANO":
-        uv = world_to_camera_view(scene, camera, point)
+        uv = world_to_camera_view(scene, camera, Vector(point))
+        if uv.z <= 0:
+            return None  # behind the camera
         return [uv.x * width - 0.5, (1 - uv.y) * height - 0.5]
     if data.panorama_type != "EQUIRECTANGULAR":
         raise RuntimeError("Only equirectangular panoramas can be projected")
@@ -552,6 +593,35 @@ def project_pixel(scene, camera, point, width, height):
     u = (longitude - data.longitude_min) / (data.longitude_max - data.longitude_min)
     v = (data.latitude_max - latitude) / (data.latitude_max - data.latitude_min)
     return [u * width - 0.5, v * height - 0.5]
+
+
+# Outward surface normals (athlete-local) of face keypoints and the minimum cosine to the
+# camera at which each stays visible. A face point turned away is hidden by the athlete's
+# own head, which the ID pass cannot reveal. Eyes look forward and slightly outward; the
+# nose stays visible a little past a pure profile, as in OpenPose output.
+FACE_VISIBILITY = {
+    "nose": ((0, -1, 0), -0.2),
+    "right_eye": ((-0.55, -0.83, 0), 0.0),
+    "left_eye": ((0.55, -0.83, 0), 0.0),
+    "right_ear": ((-1, 0, 0), 0.0),
+    "left_ear": ((1, 0, 0), 0.0),
+}
+
+
+def pose_keypoints(scene, camera, root, skeleton, job):
+    """Projected joints; face points carry a third value, False when self-occluded."""
+    camera_position = camera.matrix_world.translation
+    rotation = root.matrix_world.to_3x3().normalized()
+    keypoints = []
+    for name, local in skeleton.items():
+        point = root.matrix_world @ Vector(local)
+        pixel = project_pixel(scene, camera, point, job["width"], job["height"])
+        if pixel is not None and name in FACE_VISIBILITY:
+            normal, minimum = FACE_VISIBILITY[name]
+            towards_camera = (camera_position - point).normalized()
+            pixel.append((rotation @ Vector(normal)).normalized().dot(towards_camera) > minimum)
+        keypoints.append(pixel)
+    return keypoints
 
 
 def main():
@@ -659,6 +729,13 @@ def main():
                 "rgb": stem + ".png",
                 "instance_ids": stem + ".instances.pgm",
                 "objects": identities,
+                "poses": [
+                    {
+                        "instance_id": identity,
+                        "keypoints": pose_keypoints(scene, camera, root, skeleton, job),
+                    }
+                    for identity, (root, skeleton) in sorted(SKELETONS.items())
+                ],
             }
         )
         cameras.append(
