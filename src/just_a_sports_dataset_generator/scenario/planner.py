@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from just_a_sports_dataset_generator.core import DatasetRecipe, SceneJob
+from just_a_sports_dataset_generator.core import SPORTS, DatasetRecipe, SceneJob, labels_for_sport
 
 SUPPORTED_SCHEMA_VERSION = "1.0"
 SUPPORTED_ANNOTATIONS = frozenset(
@@ -54,6 +54,9 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
         raise RecipeError("name must be a non-empty string")
     if not isinstance(raw["sport"], str) or not raw["sport"].strip():
         raise RecipeError("sport must be a non-empty string")
+    sport = raw["sport"].strip().lower()
+    if sport not in SPORTS:
+        raise RecipeError(f"sport must be a Reco Trainer sport: {', '.join(SPORTS)}")
     if isinstance(raw["seed"], bool) or not isinstance(raw["seed"], int) or raw["seed"] < 0:
         raise RecipeError("seed must be a non-negative integer")
     resolution = raw["resolution"]
@@ -73,13 +76,14 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
     return DatasetRecipe(
         schema_version=SUPPORTED_SCHEMA_VERSION,
         name=raw["name"].strip(),
-        sport=raw["sport"].strip().lower(),
+        sport=sport,
         seed=raw["seed"],
         scenes=_positive_int(raw["scenes"], "scenes"),
         frames_per_scene=_positive_int(raw["frames_per_scene"], "frames_per_scene"),
         width=_positive_int(resolution["width"], "resolution.width"),
         height=_positive_int(resolution["height"], "resolution.height"),
         annotations=tuple(annotations),
+        labels=labels_for_sport(sport),
     )
 
 
@@ -99,6 +103,7 @@ def plan_jobs(recipe: DatasetRecipe) -> tuple[SceneJob, ...]:
             width=recipe.width,
             height=recipe.height,
             annotations=recipe.annotations,
+            labels=recipe.labels,
         )
         for index in range(recipe.scenes)
     )

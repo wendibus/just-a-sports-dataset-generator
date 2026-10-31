@@ -12,6 +12,7 @@ class DatasetRecipe:
     width: int
     height: int
     annotations: tuple[str, ...]
+    labels: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,4 +25,5 @@ class SceneJob:
     width: int
     height: int
     annotations: tuple[str, ...]
+    labels: tuple[str, ...]
 

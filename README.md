@@ -45,6 +45,10 @@ Every run should record:
 - platform and relevant hardware information;
 - file checksums and annotation validation results.
 
+## Reco Trainer compatibility
+
+Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Compatibility tests lock this mapping so taxonomy drift is detected before release.
+
 ## Update policy
 
 - Release channel: **stable**

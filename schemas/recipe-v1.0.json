@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": "1.0"},
     "name": {"type": "string", "minLength": 1},
-    "sport": {"type": "string", "minLength": 1},
+    "sport": {"enum": ["basketball", "football", "futsal", "handball", "hockey", "rugby", "lacrosse", "american_football"]},
     "seed": {"type": "integer", "minimum": 0},
     "scenes": {"type": "integer", "minimum": 1},
     "frames_per_scene": {"type": "integer", "minimum": 1},
