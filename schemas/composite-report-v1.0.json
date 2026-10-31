@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/wendibus/just-a-sports-dataset-generator/schemas/composite-report-v1.0.json",
+  "title": "Pose-guided repaint composite report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator",
+    "blend",
+    "thresholds",
+    "crops_sha256",
+    "items"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "generator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "blend": {
+      "enum": [
+        "mask",
+        "inpaint"
+      ]
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_change",
+        "max_spill",
+        "min_iou"
+      ],
+      "properties": {
+        "min_change": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_spill": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "min_iou": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "crops_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "instance_id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "instance_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "enum": [
+              "applied",
+              "rejected",
+              "missing"
+            ]
+          },
+          "reason": {
+            "enum": [
+              "ambiguous",
+              "not square",
+              "unchanged",
+              "background band changed",
+              "no unique silhouette",
+              "silhouette differs"
+            ]
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "generated": {
+            "type": "string"
+          },
+          "generated_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "change": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "spill": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "iou": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

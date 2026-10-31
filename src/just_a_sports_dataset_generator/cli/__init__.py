@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from just_a_sports_dataset_generator import __version__
+from just_a_sports_dataset_generator.composite import BLENDS, composite_crops
 from just_a_sports_dataset_generator.crops import export_crops
 from just_a_sports_dataset_generator.exporters import LocalDatasetExporter
 from just_a_sports_dataset_generator.preview import create_preview
@@ -56,6 +57,19 @@ def _parser() -> argparse.ArgumentParser:
     crops.add_argument("--margin", type=float, default=0.25)
     crops.add_argument("--min-height", type=int, default=24)
     crops.add_argument("--dilate", type=int, default=9)
+    composite = subcommands.add_parser(
+        "composite-crops", help="paste generated person crops back into a copy of a render"
+    )
+    composite.add_argument("render", type=Path)
+    composite.add_argument("--crops", type=Path, required=True)
+    composite.add_argument("--generated", type=Path, required=True)
+    composite.add_argument("--output", "-o", type=Path, required=True)
+    composite.add_argument("--blend", choices=BLENDS, default="mask")
+    composite.add_argument("--silhouettes", type=Path)
+    composite.add_argument("--min-iou", type=float, default=0.85)
+    composite.add_argument("--max-spill", type=float, default=0.15)
+    composite.add_argument("--min-change", type=float, default=0.02)
+    composite.add_argument("--generator", help="model/workflow name recorded in provenance")
     preview = subcommands.add_parser(
         "preview", help="write an offline RGB and colored-mask preview"
     )
@@ -68,6 +82,24 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
     if args.command == "preview":
         index = create_preview(args.source, args.output)
         print(f"preview: {index}")
+        return 0
+    if args.command == "composite-crops":
+        merged = composite_crops(
+            args.render,
+            args.crops,
+            args.generated,
+            args.output,
+            blend=args.blend,
+            silhouettes=args.silhouettes,
+            min_iou=args.min_iou,
+            max_spill=args.max_spill,
+            min_change=args.min_change,
+            generator=args.generator,
+        )
+        print(
+            f"applied {merged.applied} crops, rejected {merged.rejected}, "
+            f"missing {merged.missing}; details in {args.output / 'composite.json'}"
+        )
         return 0
     if args.command == "export-crops":
         result = export_crops(

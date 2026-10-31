@@ -3,8 +3,8 @@
 The procedural athletes are visibly synthetic. The intended upgrade path keeps Blender
 as the source of truth for geometry and labels and lets a local, pose-conditioned image
 model (for example Qwen-Image with a pose ControlNet, run in ComfyUI) repaint only the
-people. This document covers the data the generator provides for that; the generation
-and paste-back steps are not implemented yet.
+people. This document covers the crops the generator provides and the paste-back step. The
+generation itself runs in a tool of your choice on your own machine.
 
 ## Outputs
 
@@ -41,18 +41,55 @@ frame, instance ID, visible box, the crop box in source pixels and the scale (cr
 pixels per source pixel), so a generated crop can be resized by `1 / scale` and pasted
 back at `crop_box_xyxy`.
 
-## Keeping the labels true
+## Generating
 
-Labels are never re-detected. They stay valid as long as the paste-back only changes
-pixels inside `inpaint.png` and the generated person fills roughly the original
-silhouette. The dilation band is `dilate / scale` source pixels wide, usually under one
-pixel for small panorama players. Other people, the ball and the hoops are outside the
-mask and stay exactly as rendered, which also protects an occluding player in front.
+Feed each crop to a local inpainting workflow: `rgb.png` as the image, `inpaint.png` as
+the mask and `pose.png` into a pose ControlNet. Save the result as `<crop id>.png`
+(ComfyUI's `<crop id>_00001_.png` counter suffix is accepted, subfolders are fine).
+Results must be square; they are resized to the crop size. Record the model and
+workflow with `--generator`; any model must meet the project rules: local, offline
+after setup, and with a license recorded in [DEPENDENCIES.md](DEPENDENCIES.md).
 
-Planned next steps: a paste-back command that composites only inside the inpaint mask
-and rejects crops whose generated silhouette drifts (IoU against `mask.png`), and a
-documented ComfyUI workflow. Any model used must meet the project rules: local,
-offline after setup, and with a license recorded in [DEPENDENCIES.md](DEPENDENCIES.md).
+No ComfyUI workflow ships yet, and none has been validated against this format.
+
+## Pasting back
+
+```sh
+sports-dataset composite-crops outputs/reco --crops outputs/crops \
+  --generated outputs/generated --output outputs/reco-repainted \
+  --generator "Qwen-Image-Edit + pose ControlNet, workflow v1"
+sports-dataset export outputs/reco-repainted --output outputs/dataset
+```
+
+The result is a copy of the render that `export` and `preview` accept unchanged.
+`composite.json` ([schema](../schemas/composite-report-v1.0.json)) lists every crop as
+`applied`, `rejected` (with reason and metrics) or `missing`, with the SHA-256 of each
+generated file; every repainted `scene.json` gains a `pose-guided-repaint` asset entry,
+which `export` carries into the dataset manifest. Crops are checked against the
+untouched render, so a crop set made from a different render is refused.
+
+**Labels are never re-detected.**
+
+- `--blend mask` (default) writes generated pixels only where the instance-ID pass shows
+  that person. Silhouettes and therefore every box and mask stay exactly as rendered;
+  only the appearance changes. If the generated figure is thinner than the silhouette,
+  its background fills the difference, so keep the figure close to the pose.
+- `--blend inpaint` also accepts the dilated band (`dilate / scale` source pixels,
+  usually under one pixel for panorama players), but never pixels of another object:
+  other players, the ball and the hoops stay exactly as rendered.
+
+Quality checks reject a crop and keep the rendered person when:
+
+- the person barely changed (`--min-change`, mean colour difference inside the mask,
+  default 0.02),
+- the background band around the person changed strongly (`--max-spill`, default
+  0.15), a sign of a shifted or oversized figure,
+- `--silhouettes DIR` is given (for example from a SAM node in the same workflow,
+  named like the results) and the silhouette's IoU with the instance mask is below
+  `--min-iou` (default 0.85).
+
+The thresholds are starting points; tune them on your first batches. The silhouette
+check is a filter on generated pixels, never a source of labels.
 
 ## Limits
 
