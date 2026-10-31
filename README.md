@@ -2,7 +2,7 @@
 
 Cross-platform, open-source generator for photorealistic synthetic sports datasets with automatic ground-truth annotations for computer vision.
 
-> Project status: architecture and implementation planning. Interfaces and formats may change before the first stable release.
+> Project status: early bootstrap implementation. Recipe validation and deterministic scene-job planning are available; rendering and annotation generation are still planned. Interfaces and formats may change before the first stable release.
 
 ## Goals
 
@@ -83,7 +83,15 @@ docs/            # user and developer documentation
 
 ## Getting started
 
-The first implementation milestone will establish the configuration schema, plugin contracts, deterministic job model, and a minimal CLI. Installation and usage instructions will be added when that milestone lands.
+Requires Python 3.11 or newer.
+
+```bash
+python -m pip install -e .
+sports-dataset validate examples/basketball.json
+sports-dataset plan examples/basketball.json --output plan.json
+```
+
+The current CLI validates strict JSON recipes and expands each recipe into deterministic, resumable scene jobs. It does not render images yet. The next milestone adds plugin contracts and a minimal reference renderer adapter.
 
 ## Contributing
 

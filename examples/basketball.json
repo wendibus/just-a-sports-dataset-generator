@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "name": "basketball-smoke-test",
+  "sport": "basketball",
+  "seed": 42,
+  "scenes": 3,
+  "frames_per_scene": 12,
+  "resolution": {"width": 1280, "height": 720},
+  "annotations": ["bounding_boxes", "instance_masks", "keypoints"]
+}
+
