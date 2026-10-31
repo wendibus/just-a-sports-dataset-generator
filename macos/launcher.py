@@ -16,6 +16,8 @@ from uuid import uuid4
 
 from just_a_sports_dataset_generator import __version__
 from just_a_sports_dataset_generator.cli import main as cli_main
+from just_a_sports_dataset_generator.generators.qwen import ensure_installed
+from just_a_sports_dataset_generator.generators.qwen_setup import InstallPlan, describe
 from just_a_sports_dataset_generator.preview import create_preview
 from just_a_sports_dataset_generator.renderers.blender import find_blender
 from just_a_sports_dataset_generator.storage import new_directory
@@ -55,6 +57,7 @@ def run_dataset(
     reference: bool = False,
     progress: Callable[[str], None] | None = None,
     samples: int = 32,
+    repaint: bool = False,
 ) -> dict[str, object]:
     log = io.StringIO()
     with new_directory(destination) as staging:
@@ -71,9 +74,22 @@ def run_dataset(
                 render_args += ["--max-scenes", "3", "--max-frames", "2" if reference else "1"]
             if cli_main(render_args, progress=progress):
                 raise ValueError(log.getvalue().strip())
+            source = staging / "render"
+            if repaint:
+                # Qwen is installed beforehand with the user's consent; --yes only skips a
+                # second prompt and never triggers a download on its own here.
+                repaint_args = [
+                    "repaint",
+                    str(source),
+                    "--output",
+                    str(staging / "fotorealistisch"),
+                ]
+                if cli_main([*repaint_args, "--yes"], progress=progress):
+                    raise ValueError(log.getvalue().strip())
+                source = staging / "fotorealistisch/render"
             if progress:
                 progress("Objektmasken prüfen und COCO-Datensatz für RF-DETR erstellen …")
-            if cli_main(["export", str(staging / "render"), "--output", str(staging / "dataset")]):
+            if cli_main(["export", str(source), "--output", str(staging / "dataset")]):
                 raise ValueError(log.getvalue().strip())
         (staging / "protokoll.txt").write_text(log.getvalue(), encoding="utf-8")
         report = json.loads((staging / "dataset/report.json").read_text(encoding="utf-8"))
@@ -81,6 +97,18 @@ def run_dataset(
             progress("Farbbilder und Maskenvorschau vorbereiten …")
         create_preview(staging / "dataset", staging / "Vorschau")
     return report
+
+
+def confirm_download(plan: InstallPlan) -> bool:
+    """macOS consent dialog listing every file source, size, license and the destination."""
+    answer = apple(
+        "on run argv\nactivate\nset answer to display dialog (item 1 of argv) "
+        'with title "Qwen einrichten" buttons {"Abbrechen", "Herunterladen"} '
+        'default button "Herunterladen" cancel button "Abbrechen"\n'
+        "return button returned of answer\nend run",
+        describe(plan),
+    )
+    return answer == "Herunterladen"
 
 
 def default_folder() -> Path:
@@ -123,6 +151,16 @@ def gui() -> int:
     )
     if quality is None:
         return 0
+    photo = apple(
+        'set answer to display dialog "Spieler zusätzlich fotorealistisch mit Qwen-Image-Edit '
+        'nachbearbeiten?" & return & return & "Läuft lokal und dauert etwa 1–4 Minuten pro '
+        "Person. Die Labels bleiben unverändert. Beim ersten Mal wird Qwen nach Rückfrage "
+        'eingerichtet (ca. 31 GB)." with title "Fotorealistische Spieler" '
+        'buttons {"Abbrechen", "Nein", "Ja"} default button "Nein" cancel button "Abbrechen"\n'
+        "return button returned of answer"
+    )
+    if photo is None:
+        return 0
     folder = apple(
         "on run argv\nactivate\nset selected to choose folder with prompt "
         '"Ausgabeordner wählen. Es wird ein neuer Durchlauf angelegt." '
@@ -161,8 +199,16 @@ def gui() -> int:
     progress("Blender wird vorbereitet …")
     subprocess.run(["/usr/bin/open", str(progress_page)], check=True)
     try:
+        if photo == "Ja":
+            progress("Qwen wird geprüft …")
+            ensure_installed(confirm_download, progress=progress)
         result = run_dataset(
-            recipe, destination, demo, progress=progress, samples=64 if quality == "Fein" else 32
+            recipe,
+            destination,
+            demo,
+            progress=progress,
+            samples=64 if quality == "Fein" else 32,
+            repaint=photo == "Ja",
         )
     except Exception:
         progress("Die Berechnung wurde abgebrochen. Die App zeigt die Fehlermeldung.", failed=True)

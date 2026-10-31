@@ -11,6 +11,14 @@ from just_a_sports_dataset_generator import __version__
 from just_a_sports_dataset_generator.composite import BLENDS, composite_crops
 from just_a_sports_dataset_generator.crops import export_crops
 from just_a_sports_dataset_generator.exporters import LocalDatasetExporter
+from just_a_sports_dataset_generator.generators.qwen import ensure_installed, generate_crops
+from just_a_sports_dataset_generator.generators.qwen_setup import (
+    QUANTS,
+    InstallPlan,
+    SetupError,
+    describe,
+    installed,
+)
 from just_a_sports_dataset_generator.preview import create_preview
 from just_a_sports_dataset_generator.renderers import ReferenceRenderer
 from just_a_sports_dataset_generator.renderers.blender import BlenderBasketballRenderer
@@ -70,6 +78,31 @@ def _parser() -> argparse.ArgumentParser:
     composite.add_argument("--max-spill", type=float, default=0.15)
     composite.add_argument("--min-change", type=float, default=0.02)
     composite.add_argument("--generator", help="model/workflow name recorded in provenance")
+    setup = subcommands.add_parser(
+        "setup-qwen", help="install Qwen-Image-Edit-2511 locally (asks before downloading)"
+    )
+    setup.add_argument("--quant", choices=QUANTS, default="Q4_K_M")
+    setup.add_argument("--yes", action="store_true", help="approve the shown download")
+    subcommands.add_parser("qwen-status", help="show whether the local Qwen runtime is ready")
+    generate = subcommands.add_parser(
+        "generate-crops", help="repaint person crops with local Qwen (installs on first use)"
+    )
+    generate.add_argument("crops", type=Path)
+    generate.add_argument("--output", "-o", type=Path, required=True)
+    repaint = subcommands.add_parser(
+        "repaint", help="crops, local Qwen and paste-back in one step (installs on first use)"
+    )
+    repaint.add_argument("render", type=Path)
+    repaint.add_argument("--output", "-o", type=Path, required=True)
+    repaint.add_argument("--size", type=int, default=1024)
+    repaint.add_argument("--blend", choices=BLENDS, default="mask")
+    for command in (generate, repaint):
+        command.add_argument("--steps", type=int, default=4)
+        command.add_argument("--seed", type=int, default=0)
+        command.add_argument("--device", choices=("auto", "mps", "cuda", "cpu"), default="auto")
+        command.add_argument("--prompt", help="replace the built-in player/referee prompts")
+        command.add_argument("--quant", choices=QUANTS, default="Q4_K_M")
+        command.add_argument("--yes", action="store_true", help="approve a needed download")
     preview = subcommands.add_parser(
         "preview", help="write an offline RGB and colored-mask preview"
     )
@@ -78,7 +111,73 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _confirm(approved: bool) -> Callable[[InstallPlan], bool]:
+    def confirm(plan: InstallPlan) -> bool:
+        print(describe(plan))
+        if approved:
+            return True
+        if not sys.stdin.isatty():
+            print("Zum Bestätigen erneut mit --yes ausführen.", file=sys.stderr)
+            return False
+        answer = input("Herunterladen und einrichten? [j/N] ").strip().lower()
+        return answer in ("j", "ja", "y", "yes")
+
+    return confirm
+
+
 def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = None) -> int:
+    report = progress or print
+    if args.command == "qwen-status":
+        manifest = installed()
+        if manifest is None:
+            print("Qwen ist nicht eingerichtet. Mit 'sports-dataset setup-qwen' installieren.")
+            return 1
+        print(f"Qwen bereit: {manifest['model']} {manifest['quant']} ({manifest['base_dir']})")
+        return 0
+    if args.command == "setup-qwen":
+        manifest = ensure_installed(_confirm(args.yes), args.quant, progress=report)
+        print(f"Qwen bereit: {manifest['model']} {manifest['quant']}")
+        return 0
+    if args.command == "generate-crops":
+        made = generate_crops(
+            args.crops,
+            args.output,
+            confirm=_confirm(args.yes),
+            steps=args.steps,
+            seed=args.seed,
+            device=args.device,
+            prompt=args.prompt,
+            quant=args.quant,
+            progress=report,
+        )
+        print(f"{made.generated} von {made.total} Personen generiert in {args.output}")
+        return 0
+    if args.command == "repaint":
+        work = args.output
+        crops_dir, generated_dir, final = work / "crops", work / "generated", work / "render"
+        if final.exists():
+            raise FileExistsError(f"output already exists: {final}")
+        if not (crops_dir / "crops.json").is_file():
+            export_crops(args.render, crops_dir, args.size)
+        made = generate_crops(
+            crops_dir,
+            generated_dir,
+            confirm=_confirm(args.yes),
+            steps=args.steps,
+            seed=args.seed,
+            device=args.device,
+            prompt=args.prompt,
+            quant=args.quant,
+            progress=report,
+        )
+        merged = composite_crops(
+            args.render, crops_dir, generated_dir, final, blend=args.blend, generator=made.generator
+        )
+        print(
+            f"{merged.applied} Personen ersetzt, {merged.rejected} verworfen, "
+            f"{merged.missing} fehlen. Ergebnis: {final} (Details in composite.json)"
+        )
+        return 0
     if args.command == "preview":
         index = create_preview(args.source, args.output)
         print(f"preview: {index}")
@@ -192,7 +291,7 @@ def main(
     args = _parser().parse_args(argv)
     try:
         return _execute(args, progress)
-    except (ValueError, OSError) as exc:
+    except (ValueError, OSError, SetupError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

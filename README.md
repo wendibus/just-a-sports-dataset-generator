@@ -119,7 +119,7 @@ sports-dataset preview outputs/dataset --output outputs/Vorschau
 
 For a Reco-style full-court panorama, render `examples/basketball-reco.json` (recipe schema 1.1, `"camera": "reco_panorama"`); see [camera presets](docs/BASKETBALL.md#camera-presets).
 
-Every Blender scene also gets `poses.json` (OpenPose skeletons from the scene geometry). `sports-dataset export-crops outputs/reco --output outputs/crops` turns them into per-person RGB, mask, inpaint-mask and pose crops for pose-guided repainting, and `composite-crops` pastes generated results back without changing the labels; see [pose crops](docs/POSE_CROPS.md).
+Every Blender scene also gets `poses.json` (OpenPose skeletons from the scene geometry). `sports-dataset export-crops outputs/reco --output outputs/crops` turns them into per-person RGB, mask, inpaint-mask and pose crops for pose-guided repainting, and `composite-crops` pastes generated results back without changing the labels. `sports-dataset repaint outputs/reco --output outputs/reco-repaint` does all of it with a local Qwen-Image-Edit-2511, which it installs on first use after showing the download (about 31 GB) and asking; see [pose crops](docs/POSE_CROPS.md).
 
 Open `outputs/Vorschau/index.html`. Use `--samples 64` for finer sampling or `--blender /path/to/blender` for a nonstandard installation. CPU rendering is the default; an optional `--device auto` tries Metal on macOS. See [the basketball guide](docs/BASKETBALL.md) for scope, annotation semantics, reproducibility, and limitations.
 
