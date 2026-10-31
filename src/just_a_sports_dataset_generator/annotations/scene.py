@@ -42,8 +42,10 @@ def string(value: object) -> str:
 
 
 def safe_file(parent: Path, name: object) -> Path:
-    relative = Path(string(name))
-    if relative.is_absolute() or ".." in relative.parts or "\\" in str(relative):
+    raw = string(name)
+    relative = Path(raw)
+    # Check the serialized spelling before Windows converts '/' to '\\'.
+    if relative.is_absolute() or relative.drive or ".." in relative.parts or "\\" in raw:
         raise AnnotationError("scene file paths must be relative and stay inside the scene")
     path = (parent / relative).resolve()
     if not path.is_relative_to(parent.resolve()) or not path.is_file():
