@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Validation report v1.0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "images",
+    "annotations",
+    "fully_occluded_or_offscreen_objects",
+    "split_counts",
+    "scene_splits",
+    "warnings",
+    "checks"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "images": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "annotations": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fully_occluded_or_offscreen_objects": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "split_counts": {
+      "type": "object",
+      "required": [
+        "train",
+        "val",
+        "test"
+      ],
+      "additionalProperties": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Counts",
+        "type": "object",
+        "required": [
+          "images",
+          "annotations"
+        ],
+        "properties": {
+          "images": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "annotations": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "scene_splits": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "train",
+          "val",
+          "test"
+        ]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "additionalProperties": false
+}

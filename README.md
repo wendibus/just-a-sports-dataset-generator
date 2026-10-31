@@ -2,7 +2,7 @@
 
 Cross-platform, open-source generator for photorealistic synthetic sports datasets with automatic ground-truth annotations for computer vision.
 
-> Project status: early bootstrap implementation. Recipe validation, deterministic scene-job planning, plugin contracts, and a geometric reference renderer are available; photorealistic rendering and production annotation export are still planned. Interfaces and formats may change before the first stable release.
+> Project status: early implementation. Recipe validation, deterministic planning, a geometric reference renderer, visibility-correct annotations, and COCO/YOLO export are available. Both exports are tested against Reco Trainer's actual importer. Photorealistic sports scenes and the desktop interface are still planned.
 
 ## Goals
 
@@ -62,7 +62,9 @@ Every run should record:
 
 ## Reco Trainer compatibility
 
-Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Compatibility tests lock this mapping so taxonomy drift is detected before release.
+Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Integration tests verify both importers and class order against revision `4002883eacbe07a3a7b43dd54422e9f222203e89`.
+
+Choose the exported **coco/** or **yolo/** folder in Reco Trainer's label import, with the matching project sport. Reco currently imports detection boxes only and rebuilds train/validation/test assignments: it does **not** preserve the export's scene-separated splits. Keep the original export for evaluations that require those fixed splits. See [export instructions and limitations](docs/EXPORTS.md).
 
 These eight IDs are recognized by the planner. Sport-specific photorealistic rendering is still planned and will follow the implementation order above.
 
@@ -110,10 +112,15 @@ Requires Python 3.11 or newer.
 python -m pip install -e .
 sports-dataset validate examples/basketball.json
 sports-dataset plan examples/basketball.json --output plan.json
-sports-dataset render-reference examples/basketball.json --output outputs/demo --max-scenes 1 --max-frames 1
+sports-dataset render-reference examples/basketball.json --output outputs/demo --max-frames 2
+sports-dataset export outputs/demo --output outputs/dataset
 ```
 
-The CLI validates strict JSON recipes and expands each recipe into deterministic, resumable scene jobs. The built-in reference renderer exercises the full plugin and file-output path using simple geometric PPM/PGM images; it is a test backend, not a photorealistic renderer. The next milestone adds the normalized annotation model and COCO export.
+The reference renderer writes geometric RGB and instance-ID images. Export derives boxes and COCO masks from visible pixels, converts RGB to PNG, and writes native annotations, whole-scene splits, checksums, and provenance. Existing render/export folders are never overwritten; use a new output folder for each run. The renderer supports boxes and instance masks; other requested passes fail explicitly.
+
+These geometric images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. The next milestone is local basketball scene generation, followed by the macOS interface with preview.
+
+For development, install `python -m pip install -e ".[dev]"`, then run `python -m unittest discover -s tests -v`, `ruff check .`, `ruff format --check src tests`, and `pyright`. The [export guide](docs/EXPORTS.md) describes the optional local Reco checkout needed for importer tests. CI runs that integration check automatically against the recorded revision. Dependencies and licenses are listed in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
 
 ## Contributing
 

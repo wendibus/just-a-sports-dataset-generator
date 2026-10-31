@@ -1,5 +1,7 @@
 """Canonical Reco Trainer sport and label compatibility contract."""
 
+RECO_REVISION = "4002883eacbe07a3a7b43dd54422e9f222203e89"
+
 SPORTS = (
     "basketball",
     "football",
@@ -29,4 +31,3 @@ def labels_for_sport(sport: str) -> tuple[str, ...]:
         return _LABELS_BY_SPORT[sport]
     except KeyError as exc:
         raise ValueError(f"unsupported Reco Trainer sport: {sport!r}") from exc
-

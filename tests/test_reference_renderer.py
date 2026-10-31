@@ -21,7 +21,9 @@ class ReferenceRendererTests(unittest.TestCase):
             self.assertEqual(result.frames, 1)
             self.assertEqual(manifest["labels"], ["ball", "player", "referee", "hoop"])
             self.assertTrue((result.output_directory / manifest["frames"][0]["rgb"]).exists())
-            self.assertTrue((result.output_directory / manifest["frames"][0]["instance_ids"]).exists())
+            self.assertTrue(
+                (result.output_directory / manifest["frames"][0]["instance_ids"]).exists()
+            )
             self.assertEqual(
                 [item["class_id"] for item in manifest["frames"][0]["objects"]],
                 [0, 1, 2, 3],
@@ -44,4 +46,3 @@ class ReferenceRendererTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

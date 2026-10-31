@@ -6,6 +6,6 @@
   "scenes": 3,
   "frames_per_scene": 12,
   "resolution": {"width": 1280, "height": 720},
-  "annotations": ["bounding_boxes", "instance_masks", "keypoints"]
+  "annotations": ["bounding_boxes", "instance_masks"]
 }
 

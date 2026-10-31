@@ -34,6 +34,10 @@ Annotations are derived from scene truth, camera calibration, and render passes.
 
 Exporters write COCO, YOLO, MOT, or the native lossless format. A run manifest records normalized recipe, seeds, app/plugin/backend/model/schema versions, asset IDs and licenses, platform/hardware information, checksums, splits, and validation results.
 
+The current implementation supports COCO detection with instance RLE masks and YOLO detection. A shared normalized model derives exclusive-edge pixel boxes, visible area, and column-major RLE directly from the final instance-ID pass. Hidden objects retain native identity metadata but do not produce detection rows. Native metadata and instance-ID PNGs accompany every export; RGB files live in the selected format folders.
+
+Render and export write to sibling staging directories and publish completed directories without merging into existing outputs. Export assigns whole scenes to deterministic splits and rejects identical RGB pixels across different splits. Scene inputs are bounded to 16,777,216 pixels and 32 MiB of manifest JSON; IDs currently use an 8-bit pass (background 0, objects 1..255). These limits must be revisited for larger crowds. See [docs/EXPORTS.md](docs/EXPORTS.md) for format versions, migration, and Reco importer limitations.
+
 ## 3. Plugin model
 
 Plugin types include sports, local render backends, local asset providers, motion generators, annotation exporters, and local model integrations. Plugins must satisfy the same offline operation and no-cost requirements as the core; there is no hosted-service fallback. Every plugin ships metadata containing:

@@ -4,13 +4,16 @@ build-backend = "hatchling.build"
 
 [project]
 name = "just-a-sports-dataset-generator"
-version = "0.1.0"
+version = "0.2.0"
 description = "Deterministic planning tools for synthetic sports datasets"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "wendibus" }]
-dependencies = []
+dependencies = ["Pillow>=11.3"]
+
+[project.optional-dependencies]
+dev = ["ruff", "pyright", "build", "pycocotools", "jsonschema"]
 
 [project.scripts]
 sports-dataset = "just_a_sports_dataset_generator.cli:main"

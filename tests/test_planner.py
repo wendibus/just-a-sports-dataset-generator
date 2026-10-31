@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from just_a_sports_dataset_generator.scenario import RecipeError, load_recipe, plan_jobs
 from just_a_sports_dataset_generator.core import SPORTS, labels_for_sport
+from just_a_sports_dataset_generator.scenario import RecipeError, load_recipe, plan_jobs
 
 
 class PlannerTests(unittest.TestCase):
@@ -69,4 +69,3 @@ class PlannerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

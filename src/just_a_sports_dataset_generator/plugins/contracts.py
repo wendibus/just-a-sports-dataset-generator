@@ -27,4 +27,3 @@ class PluginMetadata:
             )
         if self.kind not in {"renderer", "sport", "exporter", "model"}:
             raise PluginCompatibilityError(f"unsupported plugin kind: {self.kind!r}")
-

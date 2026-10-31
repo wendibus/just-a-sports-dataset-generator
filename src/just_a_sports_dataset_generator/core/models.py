@@ -26,4 +26,3 @@ class SceneJob:
     height: int
     annotations: tuple[str, ...]
     labels: tuple[str, ...]
-

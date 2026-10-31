@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from just_a_sports_dataset_generator.core import SPORTS, DatasetRecipe, SceneJob, labels_for_sport
 
@@ -31,6 +31,7 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
         raise RecipeError(f"could not read recipe: {exc}") from exc
     if not isinstance(raw, dict):
         raise RecipeError("recipe root must be an object")
+    raw = cast(dict[str, Any], raw)
 
     required = {
         "schema_version",
@@ -60,13 +61,17 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
     if isinstance(raw["seed"], bool) or not isinstance(raw["seed"], int) or raw["seed"] < 0:
         raise RecipeError("seed must be a non-negative integer")
     resolution = raw["resolution"]
-    if not isinstance(resolution, dict) or set(resolution) != {"width", "height"}:
+    if not isinstance(resolution, dict):
+        raise RecipeError("resolution must contain exactly width and height")
+    resolution = cast(dict[str, Any], resolution)
+    if set(resolution) != {"width", "height"}:
         raise RecipeError("resolution must contain exactly width and height")
     annotations = raw["annotations"]
     if not isinstance(annotations, list) or not annotations:
         raise RecipeError("annotations must be a non-empty list")
-    if any(not isinstance(item, str) for item in annotations):
+    if any(not isinstance(item, str) for item in cast(list[object], annotations)):
         raise RecipeError("each annotation must be a string")
+    annotations = cast(list[str], annotations)
     unsupported = sorted(set(annotations) - SUPPORTED_ANNOTATIONS)
     if unsupported:
         raise RecipeError(f"unsupported annotations: {', '.join(unsupported)}")
@@ -107,4 +112,3 @@ def plan_jobs(recipe: DatasetRecipe) -> tuple[SceneJob, ...]:
         )
         for index in range(recipe.scenes)
     )
-

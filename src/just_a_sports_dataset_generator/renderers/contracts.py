@@ -19,7 +19,8 @@ class RenderResult:
 class Renderer(Protocol):
     metadata: PluginMetadata
 
-    def render(self, job: SceneJob, output_directory: Path, max_frames: int | None = None) -> RenderResult:
+    def render(
+        self, job: SceneJob, output_directory: Path, max_frames: int | None = None
+    ) -> RenderResult:
         """Render a job after the caller has validated plugin metadata."""
         ...
-

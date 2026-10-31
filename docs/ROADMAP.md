@@ -14,17 +14,19 @@ Downloads for installation and the planned updater may use the network. Models a
 
 ## Existing foundation
 
-Implemented: strict JSON recipes, deterministic scene-job planning, a Reco Trainer taxonomy snapshot, basic plugin contracts, and a geometric reference renderer with RGB and instance-ID files.
+Implemented: strict JSON recipes, deterministic scene-job planning, a Reco Trainer taxonomy snapshot, basic plugin contracts, a geometric reference renderer, visible-pixel annotations, COCO/YOLO exports, native instance masks, validation reports, checksums, and provenance.
 
-The reference renderer is a pipeline test fixture. Photorealistic sport scenes, production exports, and the graphical interface remain to be implemented. Recognizing eight sport IDs does not mean eight complete sport implementations exist.
+The reference renderer is a pipeline test fixture. Photorealistic sport scenes, large-scale production validation, and the graphical interface remain to be implemented. Recognizing eight sport IDs does not mean eight complete sport implementations exist.
 
-## Next: annotations and dataset export
+## Completed foundation: annotations and dataset export
 
-- Define a normalized annotation model with visibility and occlusion semantics.
-- Produce COCO and YOLO datasets with Reco Trainer label names and explicit class-ID mappings.
-- Validate image bounds, masks, bounding boxes, and handling of fully occluded objects.
-- Record seeds, versions, source licenses, and output checksums in provenance manifests.
-- Verify exported datasets with Reco Trainer's actual importer, checking image/box counts and class mappings.
+- Normalized visible-pixel boxes, areas, and COCO RLE masks; fully hidden objects are omitted.
+- COCO and YOLO datasets with Reco Trainer label names and explicit class-ID mappings.
+- Image/mask/identity validation, scene-separated splits, and rejection of identical images across splits.
+- Seeds, versions, source licenses, and output checksums in provenance manifests.
+- Actual Reco Trainer importer tests for all eight taxonomy IDs, both formats, background frames, coordinate precision, and repeated imports.
+
+Reco's importer does not preserve dataset splits and currently imports detection boxes only. See [EXPORTS.md](EXPORTS.md). This milestone does not establish photorealism or training accuracy.
 
 Before releasing each sport milestone, compare the taxonomy with the upstream Reco Trainer source and record the checked revision. Any upstream change requires an explicit compatibility update.
 

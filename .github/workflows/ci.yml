@@ -19,8 +19,31 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -e .
+      - run: python -m pip install -e ".[dev]"
       - run: python -m unittest discover -s tests -v
       - run: sports-dataset validate examples/basketball.json
       - run: sports-dataset render-reference examples/basketball.json --output build/reference --max-scenes 1 --max-frames 1
+      - run: sports-dataset export build/reference --output build/dataset
+
+  quality-and-reco:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check src tests
+      - run: pyright
+      - run: python -m build
+      - uses: actions/checkout@v4
+        with:
+          repository: wendibus/reco-trainer
+          ref: 4002883eacbe07a3a7b43dd54422e9f222203e89
+          path: build/reco-trainer
+          persist-credentials: false
+      - run: python -m unittest discover -s tests -p test_reco_integration.py -v
+        env:
+          RECO_TRAINER_PATH: build/reco-trainer
 
