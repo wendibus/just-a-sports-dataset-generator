@@ -47,7 +47,7 @@ class SchemaTests(unittest.TestCase):
                 "render-run-v1.0": root / "render/run.json",
                 "scene-v2.0": root / "render/scene-000000/scene.json",
                 "native-annotations-v1.0": root / "dataset/native/scene-000000/annotations.json",
-                "export-manifest-v1.0": root / "dataset/manifest.json",
+                "export-manifest-v2.0": root / "dataset/manifest.json",
                 "export-report-v1.0": root / "dataset/report.json",
             }
             for name, path in cases.items():

@@ -19,7 +19,7 @@ class DatasetExporter(Protocol):
     metadata: PluginMetadata
 
     def export(
-        self, source: Path, destination: Path, formats: tuple[str, ...] = ("coco", "yolo")
+        self, source: Path, destination: Path, formats: tuple[str, ...] = ("coco",)
     ) -> ExportResult:
         """Validate rendered scene handoffs and publish a new dataset directory."""
         ...

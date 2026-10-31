@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import platform
 from dataclasses import asdict
 from pathlib import Path
@@ -23,27 +22,17 @@ from .contracts import ExportResult
 SPLITS = ("train", "val", "test")
 
 
-def _yolo_axis(start: int, extent: int, size: int) -> tuple[float, float]:
-    center, length = (start + extent / 2) / size, extent / size
-    recovered = min(size, (center + length / 2) * size) - max(0, (center - length / 2) * size)
-    if recovered < extent:
-        # Reco rejects widths below one pixel, even by a rounding error. Expand
-        # only by a few floating-point ULPs (far below one pixel), never round inward.
-        length = min(1.0, length + 4 * math.ulp(center))
-    return center, length
-
-
 class LocalDatasetExporter:
     metadata = PluginMetadata(
         "org.just-a-sports-dataset-generator.local-exporter",
-        "0.2.0",
+        "0.3.0",
         PLUGIN_API_VERSION,
         "exporter",
-        ("coco", "yolo", "visible_boxes", "instance_masks"),
+        ("coco", "visible_boxes", "instance_masks"),
     )
 
     def export(
-        self, source: Path, destination: Path, formats: tuple[str, ...] = ("coco", "yolo")
+        self, source: Path, destination: Path, formats: tuple[str, ...] = ("coco",)
     ) -> ExportResult:
         self.metadata.validate()
         return export_dataset(source, destination, formats)
@@ -65,10 +54,10 @@ def scene_splits(scenes: tuple[Scene, ...]) -> dict[str, str]:
 
 
 def export_dataset(
-    source: Path, destination: Path, formats: tuple[str, ...] = ("coco", "yolo")
+    source: Path, destination: Path, formats: tuple[str, ...] = ("coco",)
 ) -> ExportResult:
-    if not formats or len(formats) != len(set(formats)) or set(formats) - {"coco", "yolo"}:
-        raise AnnotationError("choose coco, yolo, or both")
+    if formats != ("coco",):
+        raise AnnotationError("RF-DETR uses the COCO export; choose coco")
     source = source.resolve()
     destination = destination.absolute()
     if not source.is_dir():
@@ -167,34 +156,17 @@ def export_dataset(
                         "visible_annotations": [asdict(item) for item in annotations],
                     }
                 )
-                if "coco" in formats:
-                    coco_folder = staging / "coco" / ("valid" if split == "val" else split)
-                    coco_folder.mkdir(parents=True, exist_ok=True)
-                    rgb.save(coco_folder / name, format="PNG")
-                    coco[split]["images"].append(
-                        {
-                            "id": image_count,
-                            "file_name": name,
-                            "width": scene.width,
-                            "height": scene.height,
-                        }
-                    )
-                if "yolo" in formats:
-                    images = staging / "yolo" / "images" / split
-                    txt = staging / "yolo" / "labels" / split
-                    images.mkdir(parents=True, exist_ok=True)
-                    txt.mkdir(parents=True, exist_ok=True)
-                    rgb.save(images / name, format="PNG")
-                    lines: list[str] = []
-                    for item in annotations:
-                        x, y, width, height = item.bbox_xywh
-                        cx, bw = _yolo_axis(x, width, scene.width)
-                        cy, bh = _yolo_axis(y, height, scene.height)
-                        values = (cx, cy, bw, bh)
-                        lines.append(f"{item.class_id} " + " ".join(repr(v) for v in values))
-                    (txt / Path(name).with_suffix(".txt")).write_text(
-                        "\n".join(lines) + ("\n" if lines else ""), encoding="utf-8"
-                    )
+                coco_folder = staging / "coco" / ("valid" if split == "val" else split)
+                coco_folder.mkdir(parents=True, exist_ok=True)
+                rgb.save(coco_folder / name, format="PNG")
+                coco[split]["images"].append(
+                    {
+                        "id": image_count,
+                        "file_name": name,
+                        "width": scene.width,
+                        "height": scene.height,
+                    }
+                )
                 for item in annotations:
                     annotation_count += 1
                     coco[split]["annotations"].append(
@@ -226,18 +198,9 @@ def export_dataset(
                 },
             )
         for split in SPLITS:
-            if "coco" in formats:
-                folder = staging / "coco" / ("valid" if split == "val" else split)
-                folder.mkdir(parents=True, exist_ok=True)
-                write_json(folder / "_annotations.coco.json", coco[split])
-            if "yolo" in formats:
-                for kind in ("images", "labels"):
-                    (staging / "yolo" / kind / split).mkdir(parents=True, exist_ok=True)
-        if "yolo" in formats:
-            # Omitting path makes the root relative to data.yaml in Ultralytics.
-            yaml = "train: images/train\nval: images/val\ntest: images/test\nnames:\n"
-            yaml += "".join(f"  {index}: {label}\n" for index, label in enumerate(labels))
-            (staging / "yolo" / "data.yaml").write_text(yaml, encoding="utf-8")
+            folder = staging / "coco" / ("valid" if split == "val" else split)
+            folder.mkdir(parents=True, exist_ok=True)
+            write_json(folder / "_annotations.coco.json", coco[split])
         if run_provenance is not None:
             source_files["run.json"] = sha256_file(run_path)
         write_json(
@@ -261,13 +224,14 @@ def export_dataset(
             },
         )
         manifest: dict[str, Any] = {
-            "schema_version": "1.0",
+            "schema_version": "2.0",
+            "training_target": {"framework": "RF-DETR", "dataset_dir": "coco", "format": "coco"},
             "application_version": __version__,
             "exporter": asdict(LocalDatasetExporter.metadata),
             "sport": sport,
             "labels": labels,
             "class_mapping": [
-                {"label": label, "yolo_id": index, "coco_id": index + 1}
+                {"label": label, "class_id": index, "coco_id": index + 1}
                 for index, label in enumerate(labels)
             ],
             "reco_trainer_revision": RECO_REVISION,

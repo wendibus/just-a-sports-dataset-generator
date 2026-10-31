@@ -7,7 +7,6 @@ from just_a_sports_dataset_generator.annotations import (
     ObjectIdentity,
     visible_annotations,
 )
-from just_a_sports_dataset_generator.exporters.dataset import _yolo_axis
 
 
 class AnnotationTests(unittest.TestCase):
@@ -52,13 +51,3 @@ class AnnotationTests(unittest.TestCase):
         ]:
             with self.subTest(pixels=pixels, objects=objects), self.assertRaises(AnnotationError):
                 visible_annotations(1, 1, pixels, objects, "basketball")
-
-    def test_single_pixel_yolo_roundtrip_survives_reco_minimum_size(self):
-        for size in (1, 3, 7, 13, 17, 100, 1280, 4096):
-            for start in range(size):
-                center, length = _yolo_axis(start, 1, size)
-                low = max(0, (center - length / 2) * size)
-                high = min(size, (center + length / 2) * size)
-                self.assertGreaterEqual(high - low, 1)
-                self.assertAlmostEqual(low, start, places=9)
-                self.assertAlmostEqual(high, start + 1, places=9)

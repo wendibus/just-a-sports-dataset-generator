@@ -10,6 +10,8 @@ All generation, rendering, model execution, annotation, validation, preview, and
 
 The first usable basketball version includes a graphical interface with preview. Complete sport implementations in order: basketball, football/soccer, then futsal. Their canonical Reco Trainer IDs are `basketball`, `football`, and `futsal`; label spelling and ordering follow Reco Trainer.
 
+RF-DETR is the target detector and training framework, owned by Reco Trainer. The generator hands off COCO datasets. Ground truth is computed from scene data, not predicted by a detector. YOLO model integrations and exports are excluded from the current scope.
+
 ## 2. Core pipeline
 
 `recipe -> validation -> deterministic job plan -> scene graph -> render passes -> annotations -> validation -> export + manifest`
@@ -32,9 +34,9 @@ Annotations are derived from scene truth, camera calibration, and render passes.
 
 ### Export and provenance
 
-Exporters write COCO, YOLO, MOT, or the native lossless format. A run manifest records normalized recipe, seeds, app/plugin/backend/model/schema versions, asset IDs and licenses, platform/hardware information, checksums, splits, and validation results.
+Exporters write COCO for RF-DETR and native annotations; MOT export remains planned. A run manifest records normalized recipe, seeds, app/plugin/backend/model/schema versions, asset IDs and licenses, platform/hardware information, checksums, splits, and validation results.
 
-The current implementation supports COCO detection with instance RLE masks and YOLO detection. A shared normalized model derives exclusive-edge pixel boxes, visible area, and column-major RLE directly from the final instance-ID pass. Hidden objects retain native identity metadata but do not produce detection rows. Native metadata and instance-ID PNGs accompany every export; RGB files live in the selected format folders.
+The current implementation supports COCO detection with instance RLE masks for the RF-DETR data workflow. A shared normalized model derives exclusive-edge pixel boxes, visible area, and column-major RLE directly from the final instance-ID pass. Hidden objects retain native identity metadata but do not produce detection rows. Native metadata and instance-ID PNGs accompany every export; RGB files live in `coco/{train,valid,test}`. Export manifest 2.0 records RF-DETR as the training target and separates native zero-based class IDs from one-based COCO category IDs.
 
 Render and export write to sibling staging directories and publish completed directories without merging into existing outputs. Export assigns whole scenes to deterministic splits and rejects identical RGB pixels across different splits. Scene inputs are bounded to 16,777,216 pixels and 32 MiB of manifest JSON; IDs currently use an 8-bit pass (background 0, objects 1..255). These limits must be revisited for larger crowds. See [docs/EXPORTS.md](docs/EXPORTS.md) for format versions, migration, and Reco importer limitations.
 
@@ -140,7 +142,7 @@ Treat recipes, assets, plugins, manifests, archives, model files, and dataset pa
 
 1. Versioned recipe schema, normalized domain model, deterministic planner, and CLI.
 2. Minimal reference renderer adapter with RGB and instance-ID output.
-3. Native annotation model, COCO/YOLO exporters, validators, and provenance manifest; verify imports in Reco Trainer.
+3. Native annotation model, COCO exporter for RF-DETR, validators, and provenance manifest; verify Reco import and RF-DETR training-data preparation.
 4. Local basketball scene generation with freely usable assets, realistic rendering, and visibility-correct ground truth.
 5. First usable basketball application on macOS with a graphical interface, preview, and job monitoring.
 6. Football/soccer implementation, followed by futsal, using the same local pipeline and Reco Trainer conventions.

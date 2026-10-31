@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RF-DETR export manifest v2.0",
+  "type": "object",
+  "required": [
+    "exporter",
+    "schema_version",
+    "application_version",
+    "sport",
+    "labels",
+    "class_mapping",
+    "reco_trainer_revision",
+    "formats",
+    "scene_splits",
+    "sources_sha256",
+    "files_sha256",
+    "run",
+    "renderers",
+    "environment",
+    "training_target"
+  ],
+  "properties": {
+    "exporter": {
+      "type": "object",
+      "required": [
+        "plugin_id",
+        "version",
+        "plugin_api",
+        "kind",
+        "capabilities"
+      ],
+      "properties": {
+        "plugin_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plugin_api": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "const": "exporter"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "schema_version": {
+      "const": "2.0"
+    },
+    "application_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sport": {
+      "type": "string",
+      "minLength": 1
+    },
+    "labels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "class_mapping": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Class mapping",
+        "type": "object",
+        "required": [
+          "label",
+          "class_id",
+          "coco_id"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coco_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "class_id": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "reco_trainer_revision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "formats": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "coco"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "scene_splits": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "train",
+          "val",
+          "test"
+        ]
+      }
+    },
+    "sources_sha256": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "files_sha256": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "run": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "renderers": {
+      "type": "array",
+      "items": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Renderer provenance",
+        "type": "object",
+        "required": [
+          "job_id",
+          "id",
+          "version",
+          "seed",
+          "assets"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "environment": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Runtime",
+      "type": "object",
+      "required": [
+        "python",
+        "pillow",
+        "system",
+        "machine"
+      ],
+      "properties": {
+        "python": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pillow": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "machine": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "training_target": {
+      "type": "object",
+      "required": [
+        "framework",
+        "dataset_dir",
+        "format"
+      ],
+      "properties": {
+        "framework": {
+          "const": "RF-DETR"
+        },
+        "dataset_dir": {
+          "const": "coco"
+        },
+        "format": {
+          "const": "coco"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

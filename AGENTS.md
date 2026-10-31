@@ -18,6 +18,7 @@ The project is in architecture/bootstrap phase. Do not present planned functiona
 - macOS is the primary development and acceptance-test platform. Keep the core cross-platform; do not assume a particular Mac chip or memory capacity.
 - Deliver a graphical interface with preview in the first usable basketball version.
 - Complete sport implementations in this order: basketball (`basketball`), football/soccer (`football`), then futsal (`futsal`). Other Reco Trainer sport IDs remain in the taxonomy for later work.
+- Target RF-DETR training in Reco Trainer, with COCO dataset handoff. Do not add YOLO models, dependencies, or export paths without a new explicit user request. Derive synthetic ground truth from scene/render data; an RF-DETR training run is separate from dataset generation.
 - Preserve Reco Trainer sport IDs, label names, and class ordering. Taxonomy availability does not imply a completed sport renderer.
 - Prioritize correctness, realistic output, and verified Reco Trainer imports over turnaround speed.
 

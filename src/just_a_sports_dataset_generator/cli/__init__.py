@@ -29,16 +29,16 @@ def _parser() -> argparse.ArgumentParser:
     render.add_argument("--output", "-o", type=Path, required=True)
     render.add_argument("--max-scenes", type=int)
     render.add_argument("--max-frames", type=int)
-    export = subcommands.add_parser("export", help="export visible annotations as COCO and/or YOLO")
+    export = subcommands.add_parser("export", help="export visible COCO annotations for RF-DETR")
     export.add_argument("source", type=Path)
     export.add_argument("--output", "-o", type=Path, required=True)
-    export.add_argument("--format", choices=("both", "coco", "yolo"), default="both")
+    export.add_argument("--format", choices=("coco",), default="coco")
     return parser
 
 
 def _execute(args: argparse.Namespace) -> int:
     if args.command == "export":
-        formats = ("coco", "yolo") if args.format == "both" else (str(args.format),)
+        formats = (str(args.format),)
         result = LocalDatasetExporter().export(args.source, args.output, formats)
         for warning in result.warnings:
             print(f"warning: {warning}", file=sys.stderr)

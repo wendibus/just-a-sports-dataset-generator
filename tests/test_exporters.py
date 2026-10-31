@@ -21,7 +21,7 @@ RECIPE = Path(__file__).parents[1] / "examples/basketball.json"
 
 
 class ExportTests(unittest.TestCase):
-    def test_coco_masks_boxes_yolo_mapping_splits_and_checksums(self):
+    def test_rf_detr_coco_masks_boxes_mapping_splits_and_checksums(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = fixture(root / "source")
@@ -31,11 +31,17 @@ class ExportTests(unittest.TestCase):
             self.assertEqual(set(report["scene_splits"].values()), {"train", "val", "test"})
             manifest = read_json(root / "dataset/manifest.json")
             self.assertEqual(
-                manifest["class_mapping"][0], {"label": "ball", "coco_id": 1, "yolo_id": 0}
+                manifest["class_mapping"][0], {"label": "ball", "coco_id": 1, "class_id": 0}
             )
+            self.assertEqual(
+                manifest["training_target"],
+                {"framework": "RF-DETR", "dataset_dir": "coco", "format": "coco"},
+            )
+            self.assertEqual(manifest["formats"], ["coco"])
+            self.assertFalse((root / "dataset/yolo").exists())
             for name, digest in manifest["files_sha256"].items():
                 self.assertEqual(sha256_file(root / "dataset" / name), digest)
-            for split, folder in (("train", "train"), ("val", "valid"), ("test", "test")):
+            for folder in ("train", "valid", "test"):
                 path = root / "dataset/coco" / folder / "_annotations.coco.json"
                 with contextlib.redirect_stdout(io.StringIO()):
                     coco = COCO(str(path))
@@ -56,16 +62,10 @@ class ExportTests(unittest.TestCase):
                     )
                 for entry in coco.imgs.values():
                     name = entry["file_name"]
-                    with (
-                        Image.open(path.parent / name) as first,
-                        Image.open(root / "dataset/yolo/images" / split / name) as second,
-                    ):
-                        self.assertEqual(first.tobytes(), second.tobytes())
-                    txt = root / "dataset/yolo/labels" / split / Path(name).with_suffix(".txt")
-                    self.assertEqual(
-                        [int(line.split()[0]) for line in txt.read_text().splitlines()],
-                        [0, 1, 2, 3],
-                    )
+                    job_id, frame_id = name.rsplit("-frame-", 1)
+                    original = source / job_id / f"{int(Path(frame_id).stem)}.ppm"
+                    with Image.open(path.parent / name) as exported, Image.open(original) as rgb:
+                        self.assertEqual(exported.tobytes(), rgb.tobytes())
 
     def test_export_is_deterministic_and_never_overwrites(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -95,8 +95,9 @@ class ExportTests(unittest.TestCase):
             result = export_dataset(source, root / "dataset")
             self.assertEqual(result.annotations, 0)
             self.assertEqual(len(result.warnings), 3)
-            txt = next((root / "dataset/yolo/labels").rglob("*.txt"))
-            self.assertEqual(txt.read_text(), "")
+            coco = read_json(root / "dataset/coco/train/_annotations.coco.json")
+            self.assertEqual(len(coco["images"]), 1)
+            self.assertEqual(coco["annotations"], [])
             native = read_json(root / "dataset/native/scene-000000/annotations.json")
             self.assertEqual(native["frames"][0]["visible_annotations"], [])
             self.assertEqual(
@@ -162,16 +163,30 @@ class ExportTests(unittest.TestCase):
                 export_dataset(source, root / "dataset")
             self.assertFalse((root / "dataset").exists())
 
-    def test_single_format_selection(self):
-        for format_name in ("coco", "yolo"):
-            with self.subTest(format_name=format_name), tempfile.TemporaryDirectory() as directory:
+    def test_non_coco_formats_are_rejected_before_output(self):
+        for formats in (("yolo",), ("coco", "yolo"), ()):
+            with self.subTest(formats=formats), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 source = fixture(root / "source", scenes=1)
-                export_dataset(source, root / "dataset", (format_name,))
-                self.assertTrue((root / "dataset" / format_name).exists())
-                self.assertFalse(
-                    (root / "dataset" / ("yolo" if format_name == "coco" else "coco")).exists()
-                )
+                with self.assertRaisesRegex(AnnotationError, "RF-DETR"):
+                    export_dataset(source, root / "dataset", formats)
+                self.assertFalse((root / "dataset").exists())
+                with (
+                    contextlib.redirect_stderr(io.StringIO()),
+                    self.assertRaises(SystemExit) as error,
+                ):
+                    main(
+                        [
+                            "export",
+                            str(source),
+                            "--output",
+                            str(root / "dataset"),
+                            "--format",
+                            "yolo",
+                        ]
+                    )
+                self.assertEqual(error.exception.code, 2)
+                self.assertFalse((root / "dataset").exists())
 
     def test_cli_pipeline_and_errors(self):
         with tempfile.TemporaryDirectory() as directory:

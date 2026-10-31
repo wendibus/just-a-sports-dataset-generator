@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fixtures import fixture, read_json
 from PIL import Image
@@ -74,67 +75,85 @@ class RecoImporterTests(unittest.TestCase):
                     tuple(self.worker.sport_categories(sport)), labels_for_sport(sport)
                 )
 
-    def test_all_sports_both_importers_preserve_images_boxes_and_classes(self):
+    def test_all_sports_reach_rf_detr_training_data_with_correct_classes(self):
+        self.assertEqual(self.worker.MODEL_CLASSES["nano"], "RFDETRNano")
+        self.assertEqual(self.worker.MODEL_CLASSES["small"], "RFDETRSmall")
         for sport in SPORTS:
-            for format_name in ("coco", "yolo"):
-                with (
-                    self.subTest(sport=sport, format=format_name),
-                    tempfile.TemporaryDirectory() as directory,
-                ):
-                    root = Path(directory)
-                    source = fixture(root / "render", sport=sport)
-                    with contextlib.redirect_stdout(io.StringIO()):
-                        exported = export_dataset(source, root / "dataset")
-                    project = root / "project"
-                    project.mkdir()
-                    write_json(project / "project.json", {"sport": sport, "frames": []})
-                    report = self.invoke(root / "dataset" / format_name, project, format_name)
-                    self.assertEqual(report["imported"], 6)
-                    self.assertEqual(report["annotations"], exported.annotations)
-                    self.assertEqual(report["skippedClasses"], {})
-                    for field in (
-                        "invalidLines",
-                        "unreadableImages",
-                        "imagesWithoutLabels",
-                        "duplicates",
-                    ):
-                        self.assertEqual(report[field], 0, field)
-                    imported = read_json(project / "project.json")["frames"]
-                    originals = {
-                        sha256_file(path): path
-                        for path in (root / "dataset" / format_name).rglob("*.png")
-                    }
-                    for frame in imported:
-                        copied = project / frame["relativePath"]
-                        self.assertIn(sha256_file(copied), originals)
-                        original = originals[sha256_file(copied)]
-                        index = int(original.stem.rsplit("-", 1)[1])
-                        self.assertEqual(
-                            [a["category"] for a in frame["annotations"]],
-                            list(labels_for_sport(sport)),
-                        )
-                        for class_id, annotation in enumerate(frame["annotations"]):
-                            expected = (class_id * 3, 1 + index, 1 if class_id == 0 else 2, 3)
-                            actual = tuple(
-                                annotation[field] for field in ("x", "y", "width", "height")
-                            )
-                            for value, target in zip(actual, expected, strict=True):
-                                self.assertAlmostEqual(value, target, places=9)
-                    again = self.invoke(root / "dataset" / format_name, project, format_name)
-                    self.assertEqual((again["imported"], again["duplicates"]), (0, 6))
-
-    def test_background_frames_import_without_spurious_boxes(self):
-        for format_name in ("coco", "yolo"):
-            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+            with self.subTest(sport=sport), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                source = fixture(root / "render", scenes=1, frames=1)
-                Image.new("L", (17, 13)).save(source / "scene-000000/0.pgm")
-                export_dataset(source, root / "dataset")
+                source = fixture(root / "render", sport=sport)
+                exported = export_dataset(source, root / "dataset")
                 project = root / "project"
                 project.mkdir()
-                write_json(project / "project.json", {"sport": "basketball", "frames": []})
-                report = self.invoke(root / "dataset" / format_name, project, format_name)
-                self.assertEqual((report["imported"], report["annotations"]), (1, 0))
+                write_json(project / "project.json", {"sport": sport, "frames": []})
+                report = self.invoke(root / "dataset/coco", project, "coco")
+                self.assertEqual(report["imported"], 6)
+                self.assertEqual(report["annotations"], exported.annotations)
+                self.assertEqual(report["skippedClasses"], {})
+                for field in (
+                    "invalidLines",
+                    "unreadableImages",
+                    "imagesWithoutLabels",
+                    "duplicates",
+                ):
+                    self.assertEqual(report[field], 0, field)
+                imported = read_json(project / "project.json")["frames"]
+                originals = {
+                    sha256_file(path): path for path in (root / "dataset/coco").rglob("*.png")
+                }
+                for frame in imported:
+                    copied = project / frame["relativePath"]
+                    self.assertIn(sha256_file(copied), originals)
+                    original = originals[sha256_file(copied)]
+                    index = int(original.stem.rsplit("-", 1)[1])
+                    self.assertEqual(
+                        [a["category"] for a in frame["annotations"]], list(labels_for_sport(sport))
+                    )
+                    for class_id, annotation in enumerate(frame["annotations"]):
+                        expected = (class_id * 3, 1 + index, 1 if class_id == 0 else 2, 3)
+                        actual = tuple(annotation[field] for field in ("x", "y", "width", "height"))
+                        self.assertEqual(actual, expected)
+                again = self.invoke(root / "dataset/coco", project, "coco")
+                self.assertEqual((again["imported"], again["duplicates"]), (0, 6))
+
+                # Exercise Reco's real dataset builder, which train_model() calls
+                # before constructing RFDETRNano/Small. No model or weights are loaded.
+                with (
+                    contextlib.redirect_stdout(io.StringIO()),
+                    patch(
+                        "socket.socket",
+                        side_effect=AssertionError("training preparation must stay offline"),
+                    ),
+                ):
+                    training_root = self.worker.build_dataset(project, language="en")
+                labels = labels_for_sport(sport)
                 self.assertEqual(
-                    read_json(project / "project.json")["frames"][0]["annotations"], []
+                    self.worker.dataset_class_count(training_root, "train"), len(labels)
                 )
+                image_count, annotation_count = 0, 0
+                for split in ("train", "valid", "test"):
+                    coco = read_json(training_root / split / "_annotations.coco.json")
+                    self.assertEqual([c["name"] for c in coco["categories"]], list(labels))
+                    self.assertEqual(
+                        [c["id"] for c in coco["categories"]], list(range(1, len(labels) + 1))
+                    )
+                    image_count += len(coco["images"])
+                    annotation_count += len(coco["annotations"])
+                    for image in coco["images"]:
+                        self.assertTrue((training_root / split / image["file_name"]).is_file())
+                    for annotation in coco["annotations"]:
+                        self.assertIn(annotation["category_id"], range(1, len(labels) + 1))
+                self.assertEqual((image_count, annotation_count), (6, exported.annotations))
+
+    def test_background_frames_import_without_spurious_boxes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = fixture(root / "render", scenes=1, frames=1)
+            Image.new("L", (17, 13)).save(source / "scene-000000/0.pgm")
+            export_dataset(source, root / "dataset")
+            project = root / "project"
+            project.mkdir()
+            write_json(project / "project.json", {"sport": "basketball", "frames": []})
+            report = self.invoke(root / "dataset/coco", project, "coco")
+            self.assertEqual((report["imported"], report["annotations"]), (1, 0))
+            self.assertEqual(read_json(project / "project.json")["frames"][0]["annotations"], [])

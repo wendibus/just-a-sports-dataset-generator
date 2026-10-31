@@ -8,23 +8,24 @@
 - macOS is the primary target for development and acceptance testing; retain cross-platform core interfaces.
 - The first usable basketball version has a graphical interface with preview.
 - Complete sport implementations in order: **Basketball -> Football/soccer -> Futsal**.
+- RF-DETR is the target detector and training framework. Hand off COCO datasets to Reco Trainer; no YOLO model or export path.
 - Sports and labels remain compatible with Reco Trainer. Prefer correctness and validation over delivery speed.
 
 Downloads for installation and the planned updater may use the network. Models and large assets require explicit download consent. Rendering and dataset processing must remain available offline.
 
 ## Existing foundation
 
-Implemented: strict JSON recipes, deterministic scene-job planning, a Reco Trainer taxonomy snapshot, basic plugin contracts, a geometric reference renderer, visible-pixel annotations, COCO/YOLO exports, native instance masks, validation reports, checksums, and provenance.
+Implemented: strict JSON recipes, deterministic scene-job planning, a Reco Trainer taxonomy snapshot, basic plugin contracts, a geometric reference renderer, visible-pixel annotations, COCO export for RF-DETR, native instance masks, validation reports, checksums, and provenance.
 
 The reference renderer is a pipeline test fixture. Photorealistic sport scenes, large-scale production validation, and the graphical interface remain to be implemented. Recognizing eight sport IDs does not mean eight complete sport implementations exist.
 
 ## Completed foundation: annotations and dataset export
 
 - Normalized visible-pixel boxes, areas, and COCO RLE masks; fully hidden objects are omitted.
-- COCO and YOLO datasets with Reco Trainer label names and explicit class-ID mappings.
+- COCO datasets for RF-DETR with Reco Trainer label names and explicit class-ID mappings.
 - Image/mask/identity validation, scene-separated splits, and rejection of identical images across splits.
 - Seeds, versions, source licenses, and output checksums in provenance manifests.
-- Actual Reco Trainer importer tests for all eight taxonomy IDs, both formats, background frames, coordinate precision, and repeated imports.
+- Actual Reco Trainer COCO importer and RF-DETR training-data preparation tests for all eight taxonomy IDs, background frames, exact pixel boxes, and repeated imports.
 
 Reco's importer does not preserve dataset splits and currently imports detection boxes only. See [EXPORTS.md](EXPORTS.md). This milestone does not establish photorealism or training accuracy.
 

@@ -2,13 +2,13 @@
 
 Cross-platform, open-source generator for photorealistic synthetic sports datasets with automatic ground-truth annotations for computer vision.
 
-> Project status: early implementation. Recipe validation, deterministic planning, a geometric reference renderer, visibility-correct annotations, and COCO/YOLO export are available. Both exports are tested against Reco Trainer's actual importer. Photorealistic sports scenes and the desktop interface are still planned.
+> Project status: early implementation. Recipe validation, deterministic planning, a geometric reference renderer, visibility-correct annotations, and COCO export for RF-DETR are available. The export is tested through Reco Trainer's actual importer and RF-DETR training-data preparation. Photorealistic sports scenes and the desktop interface are still planned.
 
 ## Goals
 
 - Generate diverse, photorealistic sports scenes on Windows, macOS, and Linux.
 - Run the complete workflow locally with freely available components and no paid services.
-- Export images together with deterministic, machine-readable ground truth.
+- Export images and deterministic ground truth as COCO datasets for local RF-DETR training in Reco Trainer.
 - Support detection, segmentation, pose estimation, tracking, and event-recognition workflows.
 - Keep render engines, sports, annotation exporters, and models replaceable through plugins.
 - Make every dataset reproducible from a versioned configuration, seed, and asset manifest.
@@ -32,7 +32,7 @@ After setup, generation must work offline. Initial component downloads and the p
 - Configurable sports, venues, athletes, equipment, uniforms, cameras, lighting, weather, and crowd density.
 - Domain randomization plus scenario presets for controlled experiments.
 - Automatic annotations: bounding boxes, instance/semantic masks, keypoints, depth, optical flow, object IDs, camera calibration, and scene metadata.
-- Dataset exports for COCO, YOLO, MOT, and a native lossless scene format.
+- COCO datasets for RF-DETR, with native instance masks; MOT export remains planned.
 - Fully local generation with replaceable local render and model backends.
 - Validation reports for class balance, occlusion, annotation integrity, and train/validation/test leakage.
 
@@ -60,11 +60,13 @@ Every run should record:
 - platform and relevant hardware information;
 - file checksums and annotation validation results.
 
-## Reco Trainer compatibility
+## RF-DETR and Reco Trainer compatibility
 
-Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Integration tests verify both importers and class order against revision `4002883eacbe07a3a7b43dd54422e9f222203e89`.
+**RF-DETR is the target detector and training framework.** This repository generates datasets; Reco Trainer handles RF-DETR training. Ground truth comes from scene geometry and render passes. No detector needs to predict these synthetic labels. The export uses COCO, a data format accepted by RF-DETR. YOLO models and export are outside the confirmed scope.
 
-Choose the exported **coco/** or **yolo/** folder in Reco Trainer's label import, with the matching project sport. Reco currently imports detection boxes only and rebuilds train/validation/test assignments: it does **not** preserve the export's scene-separated splits. Keep the original export for evaluations that require those fixed splits. See [export instructions and limitations](docs/EXPORTS.md).
+Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Integration tests verify COCO import, RF-DETR training-data preparation, and class order against revision `4002883eacbe07a3a7b43dd54422e9f222203e89`.
+
+Choose the exported **coco/** folder in Reco Trainer's label import, with the matching project sport. Reco currently imports detection boxes only and rebuilds train/validation/test assignments: it does **not** preserve the export's scene-separated splits. Keep the original export for evaluations that require those fixed splits. See [export instructions and limitations](docs/EXPORTS.md).
 
 These eight IDs are recognized by the planner. Sport-specific photorealistic rendering is still planned and will follow the implementation order above.
 
@@ -85,7 +87,7 @@ src/
   core/          # domain model and application services
   scenario/      # recipe parsing and deterministic job expansion
   annotations/   # ground-truth generation and validation
-  exporters/     # COCO, YOLO, MOT, native format
+  exporters/     # COCO for RF-DETR and native annotations
   plugins/       # plugin contracts and discovery
   updater/       # signed manifests, compatibility, atomic installs
   cli/           # command-line interface

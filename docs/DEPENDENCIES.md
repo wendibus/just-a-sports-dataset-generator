@@ -16,6 +16,8 @@ The export milestone was checked with these distributions on macOS, Python 3.12.
 
 Pillow is the only direct runtime dependency. COCO validation tools and their NumPy dependency are development dependencies, not required for generation/export. No third-party imagery, athletes, model weights, motion captures, textures, or geometry assets are bundled. The reference fixture is generated entirely by repository code under Apache-2.0 and records its source/version in scene and run manifests.
 
-Reco Trainer is fetched only for the explicit CI compatibility test (or supplied as a local checkout). It is not bundled, modified, imported by the application, or used as a hosted service. The tests execute its existing local importer against temporary synthetic data.
+RF-DETR is the target training framework in Reco Trainer. Dataset generation itself needs no detection model or weights. This repository neither installs a YOLO/Ultralytics dependency nor exports YOLO data. Full RF-DETR training is performed by Reco Trainer, outside the generator's format/import tests.
+
+Reco Trainer is fetched only for the explicit CI compatibility test (or supplied as a local checkout). It is not bundled, modified, imported by the application, or used as a hosted service. The tests execute its existing local COCO importer and RF-DETR dataset builder against temporary synthetic data.
 
 A future desktop bundle must inventory its exact transitive dependencies and retain their notices. Future photorealistic assets and backends require separate source, license, redistribution, and no-cost checks before adoption. No such asset pack is approved by this milestone.

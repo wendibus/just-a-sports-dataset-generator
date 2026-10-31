@@ -25,7 +25,7 @@ jobs:
       - run: sports-dataset render-reference examples/basketball.json --output build/reference --max-scenes 1 --max-frames 1
       - run: sports-dataset export build/reference --output build/dataset
 
-  quality-and-reco:
+  quality-and-rf-detr-data:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
