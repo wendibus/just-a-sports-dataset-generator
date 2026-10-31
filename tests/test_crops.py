@@ -38,13 +38,20 @@ def keypoints() -> list[object]:
     return points
 
 
-def fake_worker(poses: bool = True):
+def fake_worker(
+    poses: bool = True,
+    ball: tuple[int, int, int, int] = (40, 40, 43, 43),
+    color: tuple[int, int, int] = (90, 70, 50),
+    second_player: bool = False,
+):
     def worker(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         output = Path(command[-1]).parent
-        Image.new("RGB", (64, 48), (90, 70, 50)).save(output / "frame.png")
+        Image.new("RGB", (64, 48), color).save(output / "frame.png")
         mask = Image.new("L", (64, 48), 0)
         mask.paste(10, (20, 10, 30, 40))  # player: 10 x 30 px
-        mask.paste(1, (40, 40, 43, 43))  # ball
+        mask.paste(1, ball)
+        if second_player:
+            mask.paste(11, (32, 12, 38, 40))  # inside the first player's crop box
         mask.save(output / "ids.png")
         frame: dict[str, object] = {
             "frame_index": 0,
@@ -55,8 +62,14 @@ def fake_worker(poses: bool = True):
                 {"instance_id": 10, "class_id": 1, "label": "player"},
             ],
         }
+        if second_player:
+            objects = frame["objects"]
+            assert isinstance(objects, list)
+            objects.append({"instance_id": 11, "class_id": 1, "label": "player"})
         if poses:
             frame["poses"] = [{"instance_id": 10, "keypoints": keypoints()}]
+            if second_player:
+                frame["poses"].append({"instance_id": 11, "keypoints": [[35.0, 25.0]] * 18})
         result = {"blender_version": "5.0.1", "device": "CPU", "frames": [frame]}
         (output / "worker-result.json").write_text(json.dumps(result))
         return subprocess.CompletedProcess(command, 0)
@@ -64,8 +77,8 @@ def fake_worker(poses: bool = True):
     return worker
 
 
-def render(root: Path, poses: bool = True) -> Path:
-    with patch("subprocess.run", side_effect=fake_worker(poses)):
+def render(root: Path, poses: bool = True, **worker: object) -> Path:
+    with patch("subprocess.run", side_effect=fake_worker(poses, **worker)):  # type: ignore[arg-type]
         BlenderBasketballRenderer(Path(sys.executable)).render(JOB, root / "render")
     return root / "render"
 
