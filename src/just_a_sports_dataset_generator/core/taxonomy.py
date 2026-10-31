@@ -1,6 +1,6 @@
 """Canonical Reco Trainer sport and label compatibility contract."""
 
-RECO_REVISION = "4002883eacbe07a3a7b43dd54422e9f222203e89"
+RECO_REVISION = "1fec3e34997a92e627600f68134a1b0c7eb19833"
 
 SPORTS = (
     "basketball",

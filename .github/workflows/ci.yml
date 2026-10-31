@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: wendibus/reco-trainer
-          ref: 4002883eacbe07a3a7b43dd54422e9f222203e89
+          ref: 1fec3e34997a92e627600f68134a1b0c7eb19833
           path: build/reco-trainer
           persist-credentials: false
       - run: python -m unittest discover -s tests -p test_reco_integration.py -v

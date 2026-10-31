@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "just-a-sports-dataset-generator"
-version = "0.3.1"
+version = "0.4.0"
 description = "Local synthetic sports datasets with COCO annotations for RF-DETR"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,12 +21,16 @@ sports-dataset = "just_a_sports_dataset_generator.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/just_a_sports_dataset_generator"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"licenses/GPL-3.0-or-later.txt" = "just_a_sports_dataset_generator/renderers/blender_worker/COPYING"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
 [tool.pyright]
 include = ["src"]
+exclude = ["src/just_a_sports_dataset_generator/renderers/blender_worker"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 

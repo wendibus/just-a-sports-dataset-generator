@@ -2,7 +2,7 @@
 
 Cross-platform, open-source generator for photorealistic synthetic sports datasets with automatic ground-truth annotations for computer vision.
 
-> Project status: early implementation. Recipe validation, deterministic planning, a geometric reference renderer, visibility-correct annotations, and COCO export for RF-DETR are available. The export is tested through Reco Trainer's actual importer and RF-DETR training-data preparation. Photorealistic sports scenes and the desktop interface are still planned.
+> Project status: early implementation. Version 0.4 adds local **3D basketball scenes in Blender 5.x**: a court, ten procedural athletes, a referee, ball, hoops, lighting, and visible-pixel labels from the same render. The Mac starter offers quality selection, a local progress page, and RGB/mask previews. The figures are procedural and visibly synthetic; photorealism and training benefit are **not yet validated**. COCO handoff is tested through Reco Trainer's actual importer and RF-DETR training-data preparation.
 
 ## Goals
 
@@ -15,7 +15,7 @@ Cross-platform, open-source generator for photorealistic synthetic sports datase
 
 ## Product scope and sport order
 
-macOS is the primary development and validation platform. The first usable version will include a graphical interface with scene preview, generation progress, and export controls.
+macOS is the primary development and validation platform. The Mac starter has generation dialogs, quality selection, a progress page, and an offline image preview. A full interactive scene editor and cancellation/resumption controls remain planned.
 
 Sport implementations will be completed in this order:
 
@@ -64,7 +64,7 @@ Every run should record:
 
 **RF-DETR is the target detector and training framework.** This repository generates datasets; Reco Trainer handles RF-DETR training. Ground truth comes from scene geometry and render passes. No detector needs to predict these synthetic labels. The export uses COCO, a data format accepted by RF-DETR. YOLO models and export are outside the confirmed scope.
 
-Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Integration tests verify COCO import, RF-DETR training-data preparation, and class order against revision `4002883eacbe07a3a7b43dd54422e9f222203e89`.
+Sports and object-label class order follow [wendibus/reco-trainer](https://github.com/wendibus/reco-trainer). The supported sport IDs are `basketball`, `football`, `futsal`, `handball`, `hockey`, `rugby`, `lacrosse`, and `american_football`. Plans derive the exact Reco Trainer labels for the selected sport; recipes cannot invent or reorder them. Integration tests verify COCO import, RF-DETR training-data preparation, and class order against revision `1fec3e34997a92e627600f68134a1b0c7eb19833`.
 
 Choose the exported **coco/** folder in Reco Trainer's label import, with the matching project sport. Reco currently imports detection boxes only and rebuilds train/validation/test assignments: it does **not** preserve the export's scene-separated splits. Keep the original export for evaluations that require those fixed splits. See [export instructions and limitations](docs/EXPORTS.md).
 
@@ -108,7 +108,18 @@ docs/            # user and developer documentation
 
 ## Getting started
 
-Requires Python 3.11 or newer.
+Requires Python 3.11 or newer. Install Blender 5.x separately for the basketball backend; it is already installed on the development Mac. Rendering never downloads components or assets.
+
+```bash
+python -m pip install -e .
+sports-dataset render-basketball examples/basketball-3d.json --output outputs/basketball
+sports-dataset export outputs/basketball --output outputs/dataset
+sports-dataset preview outputs/dataset --output outputs/Vorschau
+```
+
+Open `outputs/Vorschau/index.html`. Use `--samples 64` for finer sampling or `--blender /path/to/blender` for a nonstandard installation. CPU rendering is the default; an optional `--device auto` tries Metal on macOS. See [the basketball guide](docs/BASKETBALL.md) for scope, annotation semantics, reproducibility, and limitations.
+
+The old rectangle fixture remains available for fast pipeline tests:
 
 ```bash
 python -m pip install -e .
@@ -121,7 +132,7 @@ sports-dataset preview outputs/dataset --output outputs/Vorschau
 
 The reference renderer writes geometric RGB and instance-ID images. Export derives boxes and COCO masks from visible pixels, converts RGB to PNG, and writes native annotations, whole-scene splits, checksums, and provenance. Existing render/export folders are never overwritten; use a new output folder for each run. The renderer supports boxes and instance masks; other requested passes fail explicitly.
 
-These geometric images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. The next milestone is local basketball scene generation, followed by the macOS interface with preview.
+These rectangle images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. Use `render-basketball` for the new 3D scenes. The next work is improving athlete realism, pose diversity, camera controls, and validating training quality.
 
 Open `outputs/Vorschau/index.html` to compare the actual RGB images with colored object masks offline. Raw files named `*.instances.png` store small numeric object IDs and naturally look almost black in an image viewer; they are not the training photographs. The preview never changes these IDs or the COCO dataset. The Mac starter offers **Bilder ansehen** after generation and opens the training-image folder separately.
 
@@ -133,4 +144,4 @@ Issues and pull requests are welcome. Please read [AGENTS.md](AGENTS.md) before 
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE).
+The host application is licensed under [Apache License 2.0](LICENSE). The isolated Blender worker in `renderers/blender_worker/basketball.py` is [GPL-3.0-or-later](licenses/GPL-3.0-or-later.txt); it uses Blender's Python API and is invoked through a subprocess/JSON boundary. Blender is an independently installed application. No third-party models or image assets are bundled. See [dependency and asset provenance](docs/DEPENDENCIES.md).

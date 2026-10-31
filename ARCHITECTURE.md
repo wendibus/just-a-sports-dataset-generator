@@ -28,6 +28,16 @@ The scene graph represents venues, surfaces, athletes, skeletons, equipment, tea
 
 A backend consumes a scene graph and produces RGB plus requested auxiliary passes such as instance IDs, semantic classes, depth, normals, motion vectors, and visibility. Backends declare capabilities, versions, supported platforms, and deterministic limitations.
 
+Version 0.4 implements a local Blender basketball adapter alongside the geometric
+reference backend. The Apache-2.0 host launches an isolated GPL-3.0-or-later worker
+using factory settings, disabled auto-execution, and JSON/image files. Blender 5.x
+is installed separately. The worker creates all geometry/materials locally and
+exports RGB and raw Object Index from the same Cycles render. The host validates
+the pass dimensions/identities and feeds the existing annotation/export pipeline.
+No renderer-specific code is imported into core planning or annotation logic.
+The Mac adapter reports progress through an offline HTML page and opens the same
+RGB/mask preview as the CLI. See [basketball scope](docs/BASKETBALL.md).
+
 ### Annotation pipeline
 
 Annotations are derived from scene truth, camera calibration, and render passes. Each exporter consumes one normalized annotation model. Validators check finite coordinates, image bounds, mask/box consistency, stable IDs, keypoint visibility, and cross-frame continuity.

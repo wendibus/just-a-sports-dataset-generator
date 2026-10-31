@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "name": "basketball-3d-local",
+  "sport": "basketball",
+  "seed": 42,
+  "scenes": 3,
+  "frames_per_scene": 1,
+  "resolution": {"width": 1280, "height": 720},
+  "annotations": ["bounding_boxes", "instance_masks"]
+}

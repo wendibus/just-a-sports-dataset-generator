@@ -17,7 +17,7 @@ Downloads for installation and the planned updater may use the network. Models a
 
 Implemented: strict JSON recipes, deterministic scene-job planning, a Reco Trainer taxonomy snapshot, basic plugin contracts, a geometric reference renderer, visible-pixel annotations, COCO export for RF-DETR, native instance masks, validation reports, checksums, and provenance.
 
-The reference renderer is a pipeline test fixture. Photorealistic sport scenes, large-scale production validation, and the graphical interface remain to be implemented. Recognizing eight sport IDs does not mean eight complete sport implementations exist.
+The reference renderer is a pipeline test fixture. Version 0.4 adds a local Blender basketball prototype and a Mac starter with quality selection, progress, and preview. Photorealistic athlete quality, large-scale production validation, and a full scene editor remain to be implemented. Recognizing eight sport IDs does not mean eight complete sport implementations exist.
 
 ## Completed foundation: annotations and dataset export
 
@@ -32,6 +32,11 @@ Reco's importer does not preserve dataset splits and currently imports detection
 Before releasing each sport milestone, compare the taxonomy with the upstream Reco Trainer source and record the checked revision. Any upstream change requires an explicit compatibility update.
 
 ## Basketball: first usable sport
+
+Prototype delivered in 0.4: procedural hall/court, ten athletes, referee, ball,
+hoops, seeded cameras/lighting, same-render instance IDs, COCO handoff, and a Mac
+generation/preview workflow. This does **not** complete the realism/training-value
+acceptance criteria below. See [BASKETBALL.md](BASKETBALL.md).
 
 - Build local court, equipment, player, and camera scenes with freely usable assets and motions.
 - Generate realistic images and annotations from the same scene and visibility information.

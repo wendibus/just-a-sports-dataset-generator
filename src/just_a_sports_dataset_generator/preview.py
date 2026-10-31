@@ -83,6 +83,17 @@ def create_preview(dataset: Path, destination: Path, limit: int = 48) -> Path:
     labels = labels_for_sport(sport)
     if sequence(manifest.get("labels")) != list(labels):
         raise AnnotationError("preview labels differ from Reco Trainer")
+    renderers = sequence(manifest.get("renderers", []))
+    basketball_3d = any(
+        mapping(item).get("id") == "org.just-a-sports-dataset-generator.blender-basketball"
+        for item in renderers
+    )
+    status = (
+        "Lokal gerenderte 3D-Basketballszenen mit prozeduralen Figuren. "
+        "Fotorealismus und Nutzen für das Modelltraining sind noch nicht validiert."
+        if basketball_3d
+        else "Der Referenzrenderer erzeugt geometrische Testbilder. Fotorealistische Sportszenen sind noch in Entwicklung."
+    )
     cards: list[str] = []
     total = 0
     paths = sorted((dataset / "native").glob("*/annotations.json"))
@@ -166,8 +177,7 @@ def create_preview(dataset: Path, destination: Path, limit: int = 48) -> Path:
             '<p class="intro">Links stehen die Farbbilder für das Training. Rechts werden die '
             "Objektbereiche zur Kontrolle eingefärbt. Rohe Maskendateien können fast schwarz "
             "aussehen: Sie speichern Objektnummern statt sichtbarer Farben.</p>"
-            '<p class="intro">Der Referenzrenderer erzeugt geometrische Testbilder. '
-            "Fotorealistische Sportszenen sind noch in Entwicklung.</p>"
+            f'<p class="intro">{status}</p>'
             f'<p class="note">Vorschau: {len(cards)} von {total} Bildern. '
             "Für Reco Trainer den Ordner dataset/coco importieren.</p>"
             f'<div class="legend">{legend}</div>' + "".join(cards) + "</main></body></html>"

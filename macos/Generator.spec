@@ -7,7 +7,11 @@ version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["versi
 a = Analysis(
     [str(root / "macos/launcher.py")],
     pathex=[str(root / "src")],
-    datas=[(str(root / "examples"), "examples")],
+    datas=[(str(root / "examples"), "examples"),
+           (str(root / "licenses"), "Lizenzen"),
+           (str(root / "LICENSE"), "Lizenzen"),
+           (str(root / "src/just_a_sports_dataset_generator/renderers/blender_worker/basketball.py"),
+            "just_a_sports_dataset_generator/renderers/blender_worker")],
     excludes=["numpy", "tkinter", "pycocotools"],
 )
 pyz = PYZ(a.pure)
