@@ -28,7 +28,36 @@ Closing the progress page does not cancel rendering. Cancellation/resumption and
 a full scene editor are not implemented. `--reference-demo` retains the old
 rectangle test; `--demo` now generates the three 3D basketball images.
 
-## Ground truth and compatibility
+## Camera presets
+
+Recipes with `"schema_version": "1.1"` may set `"camera"`. Version 1.0 recipes keep
+the broadcast camera and reject the field.
+
+- `broadcast` (default): elevated perspective camera about 20 m behind the near
+  sideline, 9–11 m high, 35 mm lens, drifting slightly between frames.
+- `reco_panorama`: approximates the stitched full-court panorama that Reco Trainer
+  trains on. Reco stitches two wide-angle cameras at the centre of one sideline and
+  addresses the panorama by yaw/pitch; this preset renders that view directly as an
+  **equirectangular** Cycles panorama from a static mount 2.0–4.5 m high and
+  0.5–2.0 m behind the near sideline (±1 m along it). The horizontal sweep is
+  160–180°; the vertical sweep follows the aspect ratio (square pixels), and the top
+  edge is aimed 3–10° above the backboards. A roll of up to ±0.7° imitates
+  stitching misalignment. All values come from the scene seed and are recorded in
+  `worker-result.json`.
+
+```sh
+sports-dataset render-basketball examples/basketball-reco.json --output outputs/reco
+```
+
+Use a wide resolution such as 2560×720 (about 3.5:1); aspect ratios that would
+need more than 110° vertical sweep are rejected. This is a geometric approximation,
+not Reco's calibrated two-plane stitch: lens distortion residue, seams, exposure
+differences between the halves and Reco's exact yaw/pitch extent are not modelled.
+Matching a real calibration file is the next step. The ball-pixel check in
+`worker-result.json` uses an independent equirectangular projection whose Cycles
+convention (forward −Z, right +X, up +Y) was verified against rendered markers.
+
+
 
 - Reco labels stay exactly `ball`, `player`, `referee`, `hoop`, in that order.
 - All meshes belonging to one athlete share one stable instance ID. Court,

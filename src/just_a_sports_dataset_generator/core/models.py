@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+CAMERA_PRESETS = ("broadcast", "reco_panorama")
+"""Camera presets. ``reco_panorama`` approximates a stitched Reco full-court panorama."""
+
 
 @dataclass(frozen=True, slots=True)
 class DatasetRecipe:
@@ -13,6 +16,7 @@ class DatasetRecipe:
     height: int
     annotations: tuple[str, ...]
     labels: tuple[str, ...]
+    camera: str = "broadcast"
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,3 +30,4 @@ class SceneJob:
     height: int
     annotations: tuple[str, ...]
     labels: tuple[str, ...]
+    camera: str = "broadcast"

@@ -117,6 +117,8 @@ sports-dataset export outputs/basketball --output outputs/dataset
 sports-dataset preview outputs/dataset --output outputs/Vorschau
 ```
 
+For a Reco-style full-court panorama, render `examples/basketball-reco.json` (recipe schema 1.1, `"camera": "reco_panorama"`); see [camera presets](docs/BASKETBALL.md#camera-presets).
+
 Open `outputs/Vorschau/index.html`. Use `--samples 64` for finer sampling or `--blender /path/to/blender` for a nonstandard installation. CPU rendering is the default; an optional `--device auto` tries Metal on macOS. See [the basketball guide](docs/BASKETBALL.md) for scope, annotation semantics, reproducibility, and limitations.
 
 The old rectangle fixture remains available for fast pipeline tests:

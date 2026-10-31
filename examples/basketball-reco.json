@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.1",
+  "name": "basketball-reco-panorama",
+  "sport": "basketball",
+  "seed": 42,
+  "scenes": 3,
+  "frames_per_scene": 1,
+  "resolution": {"width": 2560, "height": 720},
+  "camera": "reco_panorama",
+  "annotations": ["bounding_boxes", "instance_masks"]
+}

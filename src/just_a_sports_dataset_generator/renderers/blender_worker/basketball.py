@@ -10,7 +10,6 @@ import math
 import random
 import sys
 import time
-from array import array
 from pathlib import Path
 
 import bpy
@@ -449,27 +448,110 @@ def mask_output(scene, output):
 
 
 def extract_ids(output, destination, width, height):
+    import numpy as np  # bundled with Blender
+
     paths = list(output.glob("*.exr"))
     if len(paths) != 1:
         raise RuntimeError(f"Expected exactly one raw Object Index pass, got {paths}")
     image = bpy.data.images.load(str(paths[0]), check_existing=False)
-    values = array("f", [0]) * len(image.pixels)
-    image.pixels.foreach_get(values)
-    channels = image.channels
     if tuple(image.size) != (width, height):
         raise RuntimeError("Instance pass dimensions differ from RGB")
-    ids = bytearray(width * height)
-    # Blender's image buffer starts at the bottom left; exported PNG/PGM at top left.
-    for y in range(height):
-        for x in range(width):
-            value = values[((height - 1 - y) * width + x) * channels]
-            rounded = round(value)
-            if not 0 <= rounded <= 255 or abs(value - rounded) > 0.0001:
-                raise RuntimeError("Non-integer or out-of-range object ID")
-            ids[y * width + x] = rounded
+    values = np.empty(len(image.pixels), dtype=np.float32)
+    image.pixels.foreach_get(values)
+    # Blender's image buffer starts at the bottom left; exported PGM at top left.
+    raw = values.reshape(height, width, image.channels)[::-1, :, 0]
+    rounded = np.rint(raw)
+    if (
+        not np.all(np.isfinite(raw))
+        or rounded.min() < 0
+        or rounded.max() > 255
+        or np.abs(raw - rounded).max() > 0.0001
+    ):
+        raise RuntimeError("Non-integer or out-of-range object ID")
+    ids = np.ascontiguousarray(rounded, dtype=np.uint8).tobytes()
     destination.write_bytes(f"P5\n{width} {height}\n255\n".encode() + ids)
     bpy.data.images.remove(image)
     paths[0].unlink()
+
+
+# FIBA court: 28 m x 15 m.
+COURT_HALF_WIDTH = 7.5
+BACKBOARD_X, BACKBOARD_TOP = 12.8, 3.95  # matches hoop() geometry
+
+
+def broadcast_camera(camera, rng, mirrored):
+    """Elevated sideline perspective camera; drifts slightly per frame."""
+    camera.data.type = "PERSP"
+    camera.data.lens, camera.data.sensor_width = 35, 36
+    base = (mirrored * rng.uniform(-1, 2), -rng.uniform(19, 22), rng.uniform(9, 11))
+    target = Vector((mirrored * 5, 0, 1.35))
+
+    def place(frame):
+        camera.location = (base[0] + frame * 0.12, base[1], base[2])
+        camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+
+    return place, {"preset": "broadcast", "projection": "perspective", "lens_mm": 35}
+
+
+def reco_panorama_camera(camera, rng, width, height):
+    """Approximate a stitched Reco full-court panorama.
+
+    Reco stitches two wide-angle cameras at the centre of one sideline and addresses the
+    result by yaw/pitch. This preset renders that view directly as an equirectangular
+    panorama: a static, low mount just outside the near sideline, a horizontal sweep that
+    covers the whole court, and square pixels (vertical sweep follows the aspect ratio).
+    Mount height, setback, offset, sweep, tilt and roll are randomized per scene seed.
+    """
+    data = camera.data
+    data.type = "PANO"
+    data.panorama_type = "EQUIRECTANGULAR"
+    mount_height = rng.uniform(2.0, 4.5)
+    setback = rng.uniform(0.5, 2.0)
+    offset = rng.uniform(-1.0, 1.0)
+    sweep = math.radians(rng.uniform(160, 180))
+    vertical = sweep * height / width
+    if vertical > math.radians(110):
+        raise RuntimeError("reco_panorama needs a wide aspect ratio, for example 2560x720")
+    # Keep both backboards inside the frame with a little headroom, like a real
+    # installation is aimed; the near floor below the camera is cropped instead.
+    hoop_distance = math.hypot(BACKBOARD_X, COURT_HALF_WIDTH + setback)
+    backboard_elevation = math.atan2(BACKBOARD_TOP - mount_height, hoop_distance)
+    top = backboard_elevation + math.radians(rng.uniform(3, 10))
+    data.longitude_min, data.longitude_max = -sweep / 2, sweep / 2
+    data.latitude_min, data.latitude_max = top - vertical, top
+    camera.location = (offset, -(COURT_HALF_WIDTH + setback), mount_height)
+    # Local -Z looks along +Y (across the court), local +Y is up; small stitching roll.
+    roll = math.radians(rng.uniform(-0.7, 0.7))
+    camera.rotation_euler = (math.pi / 2, roll, 0)
+
+    def place(_frame):
+        pass  # Reco cameras are fixed installations.
+
+    return place, {
+        "preset": "reco_panorama",
+        "projection": "equirectangular",
+        "mount_height_m": mount_height,
+        "sideline_setback_m": setback,
+        "longitude_range_rad": [data.longitude_min, data.longitude_max],
+        "latitude_range_rad": [data.latitude_min, data.latitude_max],
+    }
+
+
+def project_pixel(scene, camera, point, width, height):
+    """Pixel-centre coordinates of a world point for perspective or equirectangular cameras."""
+    data = camera.data
+    if data.type != "PANO":
+        uv = world_to_camera_view(scene, camera, point)
+        return [uv.x * width - 0.5, (1 - uv.y) * height - 0.5]
+    if data.panorama_type != "EQUIRECTANGULAR":
+        raise RuntimeError("Only equirectangular panoramas can be projected")
+    local = camera.matrix_world.inverted() @ Vector(point)
+    # Cycles convention, verified with rendered markers: forward -Z, right +X, up +Y.
+    longitude = math.atan2(local.x, -local.z)
+    latitude = math.atan2(local.y, math.hypot(local.x, local.z))
+    u = (longitude - data.longitude_min) / (data.longitude_max - data.longitude_min)
+    v = (data.latitude_max - latitude) / (data.latitude_max - data.latitude_min)
+    return [u * width - 0.5, v * height - 0.5]
 
 
 def main():
@@ -542,11 +624,17 @@ def main():
     athlete(30, 2, (mirrored * 3, -5.8, 0), math.pi / 2, "run", rng, 0)
     bpy.context.view_layer.update()
     ball_root = ball(players[0].matrix_world @ Vector((-mirrored * 0.49, -0.31, 0.50)))
-    camera_data = bpy.data.cameras.new("Broadcast camera")
-    camera = bpy.data.objects.new("Broadcast camera", camera_data)
+    preset = job.get("camera", "broadcast")
+    camera_data = bpy.data.cameras.new("Dataset camera")
+    camera = bpy.data.objects.new("Dataset camera", camera_data)
     bpy.context.collection.objects.link(camera)
     scene.camera = camera
-    camera_data.lens, camera_data.sensor_width = 35, 36
+    if preset == "broadcast":
+        place_camera, camera_info = broadcast_camera(camera, rng, mirrored)
+    elif preset == "reco_panorama":
+        place_camera, camera_info = reco_panorama_camera(camera, rng, job["width"], job["height"])
+    else:
+        raise RuntimeError(f"Unknown camera preset {preset!r}")
     mask_dir = output / "id-pass"
     mask_dir.mkdir()
     mask_output(scene, mask_dir)
@@ -556,12 +644,10 @@ def main():
     identities += [{"instance_id": i, "class_id": 3, "label": "hoop"} for i in (40, 41)]
     frames, cameras = [], []
     started = time.monotonic()
-    base_camera = (mirrored * rng.uniform(-1, 2), -rng.uniform(19, 22), rng.uniform(9, 11))
     for frame in range(settings["frames"]):
         scene.frame_set(frame + 1)
-        camera.location = (base_camera[0] + frame * 0.12, base_camera[1], base_camera[2])
-        target = Vector((mirrored * 5, 0, 1.35))
-        camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+        place_camera(frame)
+        bpy.context.view_layer.update()
         ball_root.location.z += 0.045 if frame % 2 else 0
         stem = f"frame-{frame:06d}"
         scene.render.filepath = str(output / (stem + ".png"))
@@ -575,17 +661,15 @@ def main():
                 "objects": identities,
             }
         )
-        ball_uv = world_to_camera_view(scene, camera, ball_root.location)
         cameras.append(
             {
                 "frame_index": frame,
+                **camera_info,
                 "world_matrix": [list(row) for row in camera.matrix_world],
-                "lens_mm": camera_data.lens,
                 "sensor_width_mm": camera_data.sensor_width,
-                "ball_pixel": [
-                    ball_uv.x * job["width"] - 0.5,
-                    (1 - ball_uv.y) * job["height"] - 0.5,
-                ],
+                "ball_pixel": project_pixel(
+                    scene, camera, ball_root.matrix_world.translation, job["width"], job["height"]
+                ),
             }
         )
         print(f"SPORTS_FRAME {frame + 1}/{settings['frames']}", flush=True)

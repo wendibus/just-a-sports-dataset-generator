@@ -2,6 +2,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from just_a_sports_dataset_generator.plugins import PluginCompatibilityError, PluginMetadata
@@ -28,6 +29,14 @@ class ReferenceRendererTests(unittest.TestCase):
                 [item["class_id"] for item in manifest["frames"][0]["objects"]],
                 [0, 1, 2, 3],
             )
+
+    def test_camera_presets_are_rejected_explicitly(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "no camera presets"):
+                ReferenceRenderer().render(
+                    replace(self.job, camera="reco_panorama"), Path(directory)
+                )
+            self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_output_is_byte_for_byte_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
