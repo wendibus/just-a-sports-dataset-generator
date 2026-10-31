@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from just_a_sports_dataset_generator.scenario import RecipeError, load_recipe, plan_jobs
+from just_a_sports_dataset_generator.renderers import ReferenceRenderer
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -17,6 +18,11 @@ def _parser() -> argparse.ArgumentParser:
     plan = subcommands.add_parser("plan", help="write a deterministic scene-job plan")
     plan.add_argument("recipe", type=Path)
     plan.add_argument("--output", "-o", type=Path)
+    render = subcommands.add_parser("render-reference", help="render deterministic geometric test data")
+    render.add_argument("recipe", type=Path)
+    render.add_argument("--output", "-o", type=Path, required=True)
+    render.add_argument("--max-scenes", type=int)
+    render.add_argument("--max-frames", type=int)
     return parser
 
 
@@ -29,6 +35,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if args.command == "validate":
         print(f"valid recipe: {recipe.name} ({recipe.scenes} scenes)")
+        return 0
+
+    if args.command == "render-reference":
+        if args.max_scenes is not None and args.max_scenes <= 0:
+            print("error: --max-scenes must be positive")
+            return 2
+        if args.max_frames is not None and args.max_frames <= 0:
+            print("error: --max-frames must be positive")
+            return 2
+        renderer = ReferenceRenderer()
+        jobs = plan_jobs(recipe)
+        if args.max_scenes is not None:
+            jobs = jobs[: args.max_scenes]
+        results = [renderer.render(job, args.output, args.max_frames) for job in jobs]
+        print(f"rendered {sum(result.frames for result in results)} frames to {args.output}")
         return 0
 
     payload = {
