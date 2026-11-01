@@ -5,6 +5,7 @@ import unittest
 
 from just_a_sports_dataset_generator.sports.basketball import (
     ANKLE_Z,
+    BENCH_Y,
     FOREARM,
     OPENPOSE_18,
     SHIN,
@@ -98,9 +99,7 @@ class LayoutTests(unittest.TestCase):
             for frame, position in enumerate(ball["positions"]):  # type: ignore[index]
                 f = holder["frames"][frame]
                 root = Root(*f["position"], f["heading"], f["height_scale"])
-                wrists = [
-                    root.world(tuple(holder["joints"][f"{s}_wrist"])) for s in ("right", "left")
-                ]
+                wrists = [root.world(tuple(f["joints"][f"{s}_wrist"])) for s in ("right", "left")]
                 # Horizontally at a hand; vertically anywhere between the floor (dribble
                 # bounce) and the hands.
                 if holder["pose"]["family"] == "dribble":
@@ -127,6 +126,93 @@ class LayoutTests(unittest.TestCase):
             if plan["situation"] == "free_throw":
                 shooter = plan["athletes"][0]  # type: ignore[index]
                 self.assertEqual(shooter["frames"][0]["position"], shooter["frames"][2]["position"])
+
+    def test_animated_frames_keep_bone_lengths_and_floor_contact(self):
+        bones = (
+            ("shoulder", "elbow", UPPER_ARM),
+            ("elbow", "wrist", FOREARM),
+            ("hip", "knee", THIGH),
+            ("knee", "ankle", SHIN),
+        )
+        for seed in range(60):
+            for athlete in plan_scene(seed, 4)["athletes"]:  # type: ignore[union-attr]
+                for frame in athlete["frames"]:
+                    joints = frame["joints"]
+                    for side in ("right", "left"):
+                        for a, b, length in bones:
+                            self.assertAlmostEqual(
+                                distance(joints[f"{side}_{a}"], joints[f"{side}_{b}"]), length, 3
+                            )
+                        self.assertAlmostEqual(joints[f"{side}_ankle"][2], ANKLE_Z, delta=0.02)
+                    self.assertGreaterEqual(frame["position"][2], 0.0)
+
+    def test_runners_cycle_their_legs_and_face_where_they_run(self):
+        checked = 0
+        for seed in range(80):
+            plan = plan_scene(seed, 4)
+            for athlete in plan["athletes"]:  # type: ignore[union-attr]
+                frames = athlete["frames"]
+                start, end = frames[0]["position"], frames[-1]["position"]
+                if athlete["pose"]["family"] != "run" or distance(start, end) < 1.5:
+                    continue
+                # The right ankle moves forward and back relative to the body.
+                strides = [f["joints"]["right_ankle"][1] for f in frames]
+                self.assertGreater(max(strides) - min(strides), 0.1)
+                dx, dy = end[0] - start[0], end[1] - start[1]
+                heading = frames[0]["heading"]
+                forward = (math.sin(heading), -math.cos(heading))  # local -y in world
+                cosine = (forward[0] * dx + forward[1] * dy) / math.hypot(dx, dy)
+                self.assertGreater(cosine, 0.9)
+                checked += 1
+        self.assertGreater(checked, 10)
+
+    def test_jumps_follow_a_ballistic_arc(self):
+        heights = []
+        for seed in range(120):
+            for athlete in plan_scene(seed, 6)["athletes"]:  # type: ignore[union-attr]
+                zs = [f["position"][2] for f in athlete["frames"]]
+                if max(zs) > 0:
+                    heights.append(zs)
+                    self.assertLessEqual(max(zs), 0.46)
+        self.assertGreater(len(heights), 10)
+        # Athletes are not frozen in the air: most jumps change height between frames.
+        self.assertGreater(sum(len(set(zs)) > 1 for zs in heights) / len(heights), 0.8)
+
+    def test_a_shot_leaves_the_hands_at_the_release(self):
+        checked = 0
+        for seed in range(400):
+            plan = plan_scene(seed, 6)
+            ball = plan["ball"]
+            if (
+                ball["event"] != "shot"
+                or "held" not in ball["states"]
+                or "air" not in ball["states"]
+            ):  # type: ignore[index]
+                continue
+            states = ball["states"]  # type: ignore[index]
+            first_air = states.index("air")
+            self.assertTrue(all(state == "held" for state in states[:first_air]))
+            # Once released, the ball rises above the shooter's set point.
+            self.assertGreater(ball["positions"][first_air][2], 1.8)  # type: ignore[index]
+            checked += 1
+        self.assertGreater(checked, 3)
+
+    def test_benches_are_beside_the_court_and_unlabelled(self):
+        found = 0
+        for seed in range(60):
+            plan = plan_scene(seed, 2)
+            athletes = plan["athletes"]  # type: ignore[assignment]
+            for person in plan["benches"]:  # type: ignore[union-attr]
+                found += 1
+                x, y = person["position"]
+                self.assertGreater(y, 8.2)
+                self.assertLessEqual(y, BENCH_Y)
+                self.assertNotIn("instance_id", person)
+                for athlete in athletes:  # type: ignore[union-attr]
+                    for frame in athlete["frames"]:
+                        ax, ay, _ = frame["position"]
+                        self.assertGreater(math.hypot(ax - x, ay - y), 0.4)
+        self.assertGreater(found, 50)
 
 
 if __name__ == "__main__":
