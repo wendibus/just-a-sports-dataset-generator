@@ -16,7 +16,7 @@ sports-dataset export outputs/render --output outputs/dataset
 sports-dataset preview outputs/dataset --output outputs/Vorschau
 ```
 
-Use new output folders. The example generates three 1280×720 images from three
+Use new output folders. An interrupted render resumes when the same command is run again: finished scenes in `<output>.partial` are kept, and only the missing ones are rendered. The example generates three 1280×720 images from three
 independent scene seeds. `--max-scenes` and `--max-frames` limit a recipe.
 `--device cpu` is the default; `--device auto` tries Metal on macOS and otherwise
 uses CPU. Cold Metal compilation can be slower than CPU. The backend was checked

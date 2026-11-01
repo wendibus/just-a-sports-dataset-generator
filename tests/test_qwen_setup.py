@@ -1,9 +1,11 @@
 import hashlib
 import http.server
+import io
 import json
 import os
 import shutil
 import sys
+import tarfile
 import tempfile
 import threading
 import unittest
@@ -15,11 +17,13 @@ from unittest.mock import patch
 from just_a_sports_dataset_generator.generators.qwen import ensure_installed
 from just_a_sports_dataset_generator.generators.qwen_setup import (
     LORA_FILE,
+    PYTHON_BUILDS,
     SetupError,
     describe,
     install,
     installed,
     plan_install,
+    python_triple,
 )
 
 BASE_FILES = {
@@ -41,8 +45,20 @@ REPOS = {
 LFS = {"text_encoder/model.safetensors", "qwen-image-edit-2511-Q4_K_M.gguf", LORA_FILE}
 
 
+def python_archive(evil: bool = False) -> bytes:
+    """A tiny stand-in for a python-build-standalone archive: python/bin/python3 runs us."""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as bundle:
+        script = f'#!/bin/sh\nexec "{sys.executable}" "$@"\n'.encode()
+        info = tarfile.TarInfo("../evil" if evil else "python/bin/python3")
+        info.size, info.mode = len(script), 0o755
+        bundle.addfile(info, io.BytesIO(script))
+    return buffer.getvalue()
+
+
 class FakeHub(http.server.BaseHTTPRequestHandler):
     license = "apache-2.0"
+    python: bytes = b""
     corrupt: str | None = None
     ranges: ClassVar[list[str]] = []
 
@@ -50,6 +66,12 @@ class FakeHub(http.server.BaseHTTPRequestHandler):
         pass
 
     def do_GET(self) -> None:
+        if self.path.startswith("/pbs/"):
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(self.python)))
+            self.end_headers()
+            self.wfile.write(self.python)
+            return
         if self.path.startswith("/api/models/"):
             repo = self.path.removeprefix("/api/models/").split("/revision/")[0]
             self._json(self._info(repo))
@@ -101,6 +123,7 @@ class QwenSetupTests(unittest.TestCase):
             {
                 "SPORTS_DATASET_HF_ENDPOINT": f"http://127.0.0.1:{self.server.server_port}",
                 "SPORTS_DATASET_HOME": str(self.home),
+                "SPORTS_DATASET_PYTHON_BASE": f"http://127.0.0.1:{self.server.server_port}/pbs",
                 "no_proxy": "127.0.0.1,localhost",
                 "NO_PROXY": "127.0.0.1,localhost",
             },
@@ -183,6 +206,41 @@ class QwenSetupTests(unittest.TestCase):
         manifest = installed()
         assert manifest is not None
         self.assertEqual(Path(str(manifest["gguf"])).read_bytes(), data)
+
+    @unittest.skipIf(sys.platform == "win32", "the stand-in interpreter is a POSIX script")
+    def test_portable_python_is_downloaded_verified_and_used(self):
+        archive = python_archive()
+        FakeHub.python = archive
+        triple = python_triple()
+        if triple is None:
+            self.skipTest("no pinned portable Python for this machine")
+        digest = hashlib.sha256(archive).hexdigest()
+        with patch.dict(PYTHON_BUILDS, {triple: digest}):
+            plan = replace(plan_install(), packages=())
+            assert plan.python is not None
+            self.assertIn("python-build-standalone", describe(plan))
+            install(plan, progress=lambda _: None)
+            manifest = installed()
+            assert manifest is not None
+            self.assertEqual(manifest["portable_python"]["sha256"], digest)  # type: ignore[index]
+            self.assertTrue((self.home / "qwen/python/bin/python3").is_file())
+            self.assertTrue(Path(str(manifest["python"])).is_file())
+
+    def test_portable_python_checksum_and_paths_are_enforced(self):
+        triple = python_triple()
+        if triple is None:
+            self.skipTest("no pinned portable Python for this machine")
+        FakeHub.python = python_archive()
+        wrong = patch.dict(PYTHON_BUILDS, {triple: "0" * 64})
+        with wrong, self.assertRaisesRegex(SetupError, "checksum mismatch for the Python"):
+            install(replace(plan_install(), packages=()), progress=lambda _: None)
+        evil = python_archive(evil=True)
+        FakeHub.python = evil
+        matching = patch.dict(PYTHON_BUILDS, {triple: hashlib.sha256(evil).hexdigest()})
+        with matching, self.assertRaisesRegex(SetupError, "unsafe path"):
+            install(replace(plan_install(), packages=()), progress=lambda _: None)
+        self.assertFalse((self.home.parent / "evil").exists())
+        self.assertIsNone(installed())
 
 
 if __name__ == "__main__":

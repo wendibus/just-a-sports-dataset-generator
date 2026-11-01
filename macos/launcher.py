@@ -5,8 +5,12 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
+import shutil
+import signal
 import subprocess
 import sys
+import threading
 from collections.abc import Callable
 from datetime import datetime
 from html import escape
@@ -17,10 +21,10 @@ from uuid import uuid4
 from just_a_sports_dataset_generator import __version__
 from just_a_sports_dataset_generator.cli import main as cli_main
 from just_a_sports_dataset_generator.generators.qwen import ensure_installed
-from just_a_sports_dataset_generator.generators.qwen_setup import InstallPlan, describe
+from just_a_sports_dataset_generator.generators.qwen_setup import InstallPlan, data_home, describe
 from just_a_sports_dataset_generator.preview import create_preview
 from just_a_sports_dataset_generator.renderers.blender import find_blender
-from just_a_sports_dataset_generator.storage import new_directory
+from just_a_sports_dataset_generator.storage import write_json
 
 TITLE = "Just a Sports Dataset Generator"
 RESOURCES = Path(__file__).resolve().parent
@@ -49,6 +53,10 @@ def message(text: str) -> None:
     )
 
 
+def work_folder(destination: Path) -> Path:
+    return destination.with_name(destination.name + ".partial")
+
+
 def run_dataset(
     recipe: Path,
     destination: Path,
@@ -59,14 +67,44 @@ def run_dataset(
     samples: int = 32,
     repaint: bool = False,
 ) -> dict[str, object]:
+    """Render, optionally repaint, export and preview into a resumable work folder.
+
+    Everything happens in ``<destination>.partial``. Rendering and Qwen generation resume
+    where they stopped; export and preview are recreated. On success the folder is
+    published as ``destination``.
+    """
+    if destination.exists():
+        raise FileExistsError(f"output already exists: {destination}")
+    work = work_folder(destination)
+    settings: dict[str, object] = {
+        "recipe": str(recipe.resolve()),
+        "demo": demo,
+        "reference": reference,
+        "samples": samples,
+        "repaint": repaint,
+    }
+    marker = work / "launcher.json"
+    if work.exists():
+        try:
+            previous = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = None
+        if previous != settings:
+            raise FileExistsError(f"{work} belongs to a run with other settings")
+        if progress:
+            progress("Abgebrochener Durchlauf wird fortgesetzt …")
+    else:
+        work.mkdir(parents=True)
+        write_json(marker, settings)
     log = io.StringIO()
-    with new_directory(destination) as staging:
-        with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+    with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+        render = work / "render"
+        if not render.is_dir():  # finished renders are published; render.partial resumes
             render_args = [
                 "render-reference" if reference else "render-basketball",
                 str(recipe),
                 "--output",
-                str(staging / "render"),
+                str(render),
             ]
             if not reference:
                 render_args += ["--samples", str(samples)]
@@ -74,29 +112,106 @@ def run_dataset(
                 render_args += ["--max-scenes", "3", "--max-frames", "2" if reference else "1"]
             if cli_main(render_args, progress=progress):
                 raise ValueError(log.getvalue().strip())
-            source = staging / "render"
-            if repaint:
+        source = render
+        if repaint:
+            source = work / "fotorealistisch/render"
+            if not source.is_dir():
                 # Qwen is installed beforehand with the user's consent; --yes only skips a
                 # second prompt and never triggers a download on its own here.
-                repaint_args = [
-                    "repaint",
-                    str(source),
-                    "--output",
-                    str(staging / "fotorealistisch"),
-                ]
+                repaint_args = ["repaint", str(render), "--output", str(work / "fotorealistisch")]
                 if cli_main([*repaint_args, "--yes"], progress=progress):
                     raise ValueError(log.getvalue().strip())
-                source = staging / "fotorealistisch/render"
-            if progress:
-                progress("Objektmasken prüfen und COCO-Datensatz für RF-DETR erstellen …")
-            if cli_main(["export", str(source), "--output", str(staging / "dataset")]):
-                raise ValueError(log.getvalue().strip())
-        (staging / "protokoll.txt").write_text(log.getvalue(), encoding="utf-8")
-        report = json.loads((staging / "dataset/report.json").read_text(encoding="utf-8"))
+        for derived in (work / "dataset", work / "Vorschau"):
+            shutil.rmtree(derived, ignore_errors=True)  # quick to recreate from the render
         if progress:
-            progress("Farbbilder und Maskenvorschau vorbereiten …")
-        create_preview(staging / "dataset", staging / "Vorschau")
+            progress("Objektmasken prüfen und COCO-Datensatz für RF-DETR erstellen …")
+        if cli_main(["export", str(source), "--output", str(work / "dataset")]):
+            raise ValueError(log.getvalue().strip())
+    with (work / "protokoll.txt").open("a", encoding="utf-8") as protocol:
+        protocol.write(log.getvalue())
+    report = json.loads((work / "dataset/report.json").read_text(encoding="utf-8"))
+    if progress:
+        progress("Farbbilder und Maskenvorschau vorbereiten …")
+    create_preview(work / "dataset", work / "Vorschau")
+    marker.unlink()
+    work.rename(destination)
     return report
+
+
+def state_file() -> Path:
+    return data_home() / "launcher-state.json"
+
+
+def remember_unfinished(destination: Path) -> None:
+    state_file().parent.mkdir(parents=True, exist_ok=True)
+    write_json(state_file(), {"unfinished": str(destination)})
+
+
+def forget_unfinished() -> None:
+    state_file().unlink(missing_ok=True)
+
+
+def unfinished_run() -> tuple[Path, dict[str, object]] | None:
+    """The last interrupted run and its settings, if its work folder still exists."""
+    try:
+        destination = Path(json.loads(state_file().read_text(encoding="utf-8"))["unfinished"])
+        settings = json.loads((work_folder(destination) / "launcher.json").read_text("utf-8"))
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        return None
+    if destination.exists() or not isinstance(settings, dict):
+        return None
+    return destination, settings
+
+
+class CancelDialog:
+    """A second, non-blocking dialog with an Abbrechen button while the run is busy.
+
+    Cancelling stops the running Blender or Qwen process (children of this app); the run
+    then fails like any interrupted run and keeps every finished scene for resuming.
+    """
+
+    def __init__(self) -> None:
+        self.cancelled = False
+        self.closed = False
+        self.process: subprocess.Popen[str] | None = None
+
+    def start(self) -> None:
+        script = (
+            'display dialog "Die Berechnung läuft lokal auf deinem Mac." & return & return & '
+            '"Abbrechen ist jederzeit möglich. Fertige Szenen und generierte Spieler bleiben '
+            'erhalten und können beim nächsten Start fortgesetzt werden." '
+            f'with title "{TITLE}" buttons {{"Abbrechen"}} default button "Abbrechen"'
+        )
+        self.process = subprocess.Popen(
+            ["/usr/bin/osascript", "-e", script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        threading.Thread(target=self._wait, daemon=True).start()
+
+    def _wait(self) -> None:
+        assert self.process is not None
+        output, _ = self.process.communicate()
+        if not self.closed and self.process.returncode == 0 and "Abbrechen" in output:
+            self.cancelled = True
+            stop_children(exclude=self.process.pid)
+
+    def close(self) -> None:
+        self.closed = True
+        if self.process is not None and self.process.poll() is None:
+            self.process.terminate()
+
+
+def stop_children(exclude: int) -> None:
+    """Ask every child process of this app (Blender, Qwen worker) to stop."""
+    found = subprocess.run(
+        ["/usr/bin/pgrep", "-P", str(os.getpid())], capture_output=True, text=True, check=False
+    ).stdout.split()
+    for pid in found:
+        if int(pid) != exclude:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(int(pid), signal.SIGTERM)
 
 
 def confirm_download(plan: InstallPlan) -> bool:
@@ -119,6 +234,28 @@ def default_folder() -> Path:
 
 
 def gui() -> int:
+    resume = unfinished_run()
+    if resume is not None:
+        destination, saved = resume
+        answer = apple(
+            "on run argv\nactivate\nset answer to display dialog (item 1 of argv) "
+            'with title (item 2 of argv) buttons {"Neu starten", "Fortsetzen"} '
+            'default button "Fortsetzen"\nreturn button returned of answer\nend run',
+            "Ein abgebrochener Durchlauf wurde gefunden:\n"
+            f"{destination.name}\n\nFertige Szenen und generierte Spieler bleiben erhalten; "
+            "nur der Rest wird berechnet.",
+            TITLE,
+        )
+        if answer == "Fortsetzen":
+            find_blender()
+            return execute(
+                destination,
+                Path(str(saved["recipe"])),
+                bool(saved["demo"]),
+                int(str(saved["samples"])),
+                bool(saved["repaint"]),
+            )
+        forget_unfinished()  # the folder stays; it can be deleted by hand
     choice = apple(
         "on run argv\nactivate\nset answer to display dialog "
         '("Version " & (item 1 of argv) & " · lokal · RF-DETR" & return & return & '
@@ -171,6 +308,11 @@ def gui() -> int:
         return 0
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     destination = Path(folder) / "Ausgaben" / f"Durchlauf-{stamp}-{uuid4().hex[:6]}"
+    return execute(destination, recipe, demo, 64 if quality == "Fein" else 32, photo == "Ja")
+
+
+def execute(destination: Path, recipe: Path, demo: bool, samples: int, repaint: bool) -> int:
+    """Run (or resume) one Durchlauf with a progress page and an Abbrechen dialog."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     progress_page = destination.parent / (destination.name + "-Fortschritt.html")
 
@@ -198,21 +340,29 @@ def gui() -> int:
 
     progress("Blender wird vorbereitet …")
     subprocess.run(["/usr/bin/open", str(progress_page)], check=True)
+    remember_unfinished(destination)
+    cancel = CancelDialog()
+    cancel.start()
     try:
-        if photo == "Ja":
+        if repaint:
             progress("Qwen wird geprüft …")
             ensure_installed(confirm_download, progress=progress)
         result = run_dataset(
-            recipe,
-            destination,
-            demo,
-            progress=progress,
-            samples=64 if quality == "Fein" else 32,
-            repaint=photo == "Ja",
+            recipe, destination, demo, progress=progress, samples=samples, repaint=repaint
         )
     except Exception:
+        if cancel.cancelled:
+            progress("Abgebrochen. Beim nächsten Start kannst du fortsetzen.", failed=True)
+            message(
+                "Die Berechnung wurde abgebrochen.\n\nFertige Szenen bleiben erhalten. "
+                "Beim nächsten Start bietet die App „Fortsetzen“ an."
+            )
+            return 0
         progress("Die Berechnung wurde abgebrochen. Die App zeigt die Fehlermeldung.", failed=True)
         raise
+    finally:
+        cancel.close()
+    forget_unfinished()
     progress("Fertig. Die Bildvorschau wird geöffnet.", finished=True)
     completed = apple(
         "on run argv\nactivate\nset answer to display dialog (item 1 of argv) "
