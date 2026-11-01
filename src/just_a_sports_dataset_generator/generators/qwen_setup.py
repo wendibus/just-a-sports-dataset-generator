@@ -18,9 +18,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
@@ -47,6 +49,18 @@ PACKAGES = (
     "Pillow>=11.3",
 )
 PACKAGES_ESTIMATE_BYTES = 2_000_000_000
+# Portable CPython from python-build-standalone, pinned by release, version and SHA-256, so
+# the runtime never depends on (or alters) a system Python. Checksums from the release's
+# SHA256SUMS; the Linux x86_64 build was downloaded and verified when pinning.
+PYTHON_RELEASE, PYTHON_VERSION = "20260901", "3.12.14"
+PYTHON_BUILDS = {
+    "aarch64-apple-darwin": "81a359f1cfadd4da11766534c5913791cea55f26e1bb902cacd2a531bb1e4b2b",
+    "x86_64-apple-darwin": "65b195c9cedc1fef6767f044f9822069adbd1bd9204d424ece4628776fdc04bb",
+    "aarch64-unknown-linux-gnu": "577b4bec0793ad1ff0cbff9adbd0df078eddde38a4c41bf5d83ad381a85ee39d",
+    "x86_64-unknown-linux-gnu": "72748da13197c1fb161e3afeef20a6a385ff24f2165e6e2758e47008e7faba4c",
+    "x86_64-pc-windows-msvc": "7c45c9622400d578709a9b2cddbe8124cc21d382409d9f13406d706d28e31b14",
+}
+PYTHON_ESTIMATE_BYTES = 35_000_000
 INSTALL_SCHEMA = "1.0"
 
 
@@ -83,15 +97,53 @@ class Component:
 
 
 @dataclass(frozen=True, slots=True)
+class PortablePython:
+    triple: str
+    url: str
+    sha256: str
+    version: str
+
+
+@dataclass(frozen=True, slots=True)
 class InstallPlan:
     home: Path
     quant: str
     components: tuple[Component, ...]
     packages: tuple[str, ...]
+    python: PortablePython | None = None
+    """Portable interpreter to download; None falls back to a local Python 3.10–3.13."""
 
     @property
     def download_bytes(self) -> int:
-        return sum(component.size for component in self.components)
+        models = sum(component.size for component in self.components)
+        return models + (PYTHON_ESTIMATE_BYTES if self.python else 0)
+
+
+def python_triple() -> str | None:
+    """python-build-standalone target for this machine, or None if no pinned build fits."""
+    machine = platform.machine().lower()
+    arch = {"arm64": "aarch64", "aarch64": "aarch64", "x86_64": "x86_64", "amd64": "x86_64"}.get(
+        machine
+    )
+    system = {"darwin": "apple-darwin", "linux": "unknown-linux-gnu", "win32": "pc-windows-msvc"}
+    if arch is None or sys.platform not in system:
+        return None
+    triple = f"{arch}-{system[sys.platform]}"
+    return triple if triple in PYTHON_BUILDS else None
+
+
+def portable_python() -> PortablePython | None:
+    triple = python_triple()
+    if triple is None:
+        return None
+    base = os.environ.get(
+        "SPORTS_DATASET_PYTHON_BASE",
+        "https://github.com/astral-sh/python-build-standalone/releases/download",
+    ).rstrip("/")
+    name = f"cpython-{PYTHON_VERSION}%2B{PYTHON_RELEASE}-{triple}-install_only_stripped.tar.gz"
+    return PortablePython(
+        triple, f"{base}/{PYTHON_RELEASE}/{name}", PYTHON_BUILDS[triple], PYTHON_VERSION
+    )
 
 
 def data_home() -> Path:
@@ -223,7 +275,7 @@ def plan_install(quant: str = "Q4_K_M", home: Path | None = None) -> InstallPlan
     gguf = [f for f in components[1].files if f.path.endswith(".gguf")]
     if len(gguf) != 1:
         raise SetupError(f"expected exactly one {quant} GGUF file, found {len(gguf)}")
-    return InstallPlan(qwen_home(home), quant, components, PACKAGES)
+    return InstallPlan(qwen_home(home), quant, components, PACKAGES, portable_python())
 
 
 def describe(plan: InstallPlan) -> str:
@@ -238,6 +290,11 @@ def describe(plan: InstallPlan) -> str:
             f"- {component.repo} @ {component.revision[:12]} — {component.purpose}: "
             f"{len(component.files)} Datei(en), {component.size / gigabytes:.1f} GB, "
             f"Lizenz {component.license}"
+        )
+    if plan.python:
+        lines.append(
+            f"- Python {plan.python.version} (python-build-standalone {PYTHON_RELEASE}, "
+            f"{plan.python.triple}): ca. {PYTHON_ESTIMATE_BYTES / 1e6:.0f} MB, Lizenz PSF-2.0"
         )
     lines += [
         (
@@ -346,6 +403,53 @@ def _pip_install(interpreter: Path, packages: tuple[str, ...], log_path: Path) -
         raise SetupError(f"package installation failed; see {log_path}")
 
 
+def _install_python(python: PortablePython, home: Path, progress: Callable[[str], None]) -> Path:
+    """Download, verify and safely unpack the portable interpreter; return its executable."""
+    folder = home / "python"
+    executable = folder / ("python.exe" if sys.platform == "win32" else "bin/python3")
+    marker = folder / ".sha256"
+    if executable.is_file() and marker.is_file() and marker.read_text().strip() == python.sha256:
+        return executable
+    progress(f"Python {python.version} wird geladen …")
+    archive = home / "downloads" / "python.tar.gz"
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with urllib.request.urlopen(python.url, timeout=60) as response, archive.open("wb") as out:
+            shutil.copyfileobj(response, out, 4 * 1024 * 1024)
+    except OSError as exc:
+        raise SetupError(f"download of Python failed: {exc}") from exc
+    digest = hashlib.sha256()
+    with archive.open("rb") as stream:
+        for block in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            digest.update(block)
+    if digest.hexdigest() != python.sha256:
+        archive.unlink()
+        raise SetupError("checksum mismatch for the Python download; it was removed")
+    staging = home / "python.partial"
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir()
+    with tarfile.open(archive) as bundle:
+        for member in bundle.getmembers():
+            target = (staging / member.name).resolve()
+            if not target.is_relative_to(staging.resolve()) or member.isdev():
+                shutil.rmtree(staging, ignore_errors=True)
+                raise SetupError(f"unsafe path in the Python archive: {member.name}")
+        if hasattr(tarfile, "data_filter"):  # Python >= 3.11.4: also rejects unsafe links
+            bundle.extractall(staging, filter="data")
+        else:  # members were validated above
+            bundle.extractall(staging)
+    unpacked = staging / "python"
+    if not (unpacked / executable.relative_to(folder)).is_file():
+        shutil.rmtree(staging, ignore_errors=True)
+        raise SetupError("the Python archive does not contain the expected interpreter")
+    shutil.rmtree(folder, ignore_errors=True)
+    unpacked.replace(folder)
+    shutil.rmtree(staging, ignore_errors=True)
+    archive.unlink()
+    marker.write_text(python.sha256)
+    return executable
+
+
 def model_dir(home: Path, repo: str, revision: str) -> Path:
     return home / "models" / repo.replace("/", "--") / revision
 
@@ -369,8 +473,13 @@ def install(
     runtime = home / "runtime"
     interpreter = runtime_python(home.parent)
     if not interpreter.is_file():
+        if python is not None:
+            base = python
+        elif plan.python is not None:
+            base = _install_python(plan.python, home, progress)
+        else:
+            base = find_python()
         progress("Python-Umgebung wird angelegt …")
-        base = python or find_python()
         command = [str(base), "-m", "venv", str(runtime)]
         result = subprocess.run(
             command + ([] if plan.packages else ["--without-pip"]),
@@ -396,6 +505,7 @@ def install(
         "quant": plan.quant,
         "packages": list(plan.packages),
         "python": str(interpreter),
+        "portable_python": asdict(plan.python) if plan.python else None,
         "base_dir": str(model_dir(home, plan.components[0].repo, plan.components[0].revision)),
         "gguf": str(model_dir(home, gguf.repo, gguf.revision) / gguf.path),
         "lora": str(

@@ -32,7 +32,9 @@ fetched in the background, and a component that reports a license other than Apa
 is refused. Every file is checked against the SHA-256 (large files) or Git blob SHA-1
 (small files) published by Hugging Face; the install manifest, written last, records
 commits, sizes and checksums, and each generation run copies it into `generation.json`.
-The runtime lives in its own Python environment under the user data folder (macOS:
+The interpreter is a pinned portable CPython (see table), so the Mac app works without
+Homebrew or python.org; on platforms without a pinned build the installer falls back to a
+local Python 3.10–3.13. The runtime lives in its own Python environment under the user data folder (macOS:
 `~/Library/Application Support/JustASportsDatasetGenerator/qwen`) and is never bundled.
 
 | Component | Source | Purpose | License |
@@ -40,6 +42,7 @@ The runtime lives in its own Python environment under the user data folder (macO
 | Qwen-Image-Edit-2511 (text encoder, VAE, tokenizer, configs) | `Qwen/Qwen-Image-Edit-2511` | Image editing model, components except the transformer weights | Apache-2.0 |
 | Qwen-Image-Edit-2511 GGUF, default Q4_K_M (12.8 GB) | `unsloth/Qwen-Image-Edit-2511-GGUF` | Quantized image transformer that fits a 48 GB Mac | Apache-2.0 |
 | Qwen-Image-Edit-2511-Lightning 4-step LoRA (bf16) | `lightx2v/Qwen-Image-Edit-2511-Lightning` | 4-step distillation, about 10× fewer steps | Apache-2.0 |
+| CPython 3.12.14, python-build-standalone release 20260901 (`install_only_stripped`) | GitHub release `astral-sh/python-build-standalone` | Portable interpreter for the isolated runtime, pinned by SHA-256 per platform (macOS arm64/x86_64, Linux x86_64/aarch64, Windows x86_64); no system Python needed | PSF-2.0 (CPython); bundled libraries keep their licenses (e.g. OpenSSL Apache-2.0) |
 | torch 2.9.1, diffusers 0.36.0, transformers 4.57.3, accelerate 1.12.0, peft 0.18.0, gguf 0.17.1, safetensors 0.7.0, huggingface-hub 0.36.0 | PyPI | Runtime in the isolated environment; pinned to a combination reported working for GGUF Qwen-Image-Edit-2511 in diffusers | BSD-3-Clause (torch), Apache-2.0 (diffusers, transformers, accelerate, peft, safetensors, huggingface-hub), MIT (gguf) |
 
 Qwen-Image 2.1 was considered and rejected: its Qwen Research License permits
