@@ -1,0 +1,151 @@
+{
+  "crops": [
+    {
+      "bbox_xywh": [
+        95,
+        385,
+        69,
+        89
+      ],
+      "crop_box_xyxy": [
+        54,
+        354,
+        206,
+        506
+      ],
+      "files": {
+        "inpaint": "scene-000002/scene-000002-f000000-i014.inpaint.png",
+        "mask": "scene-000002/scene-000002-f000000-i014.mask.png",
+        "pose": "scene-000002/scene-000002-f000000-i014.pose.png",
+        "rgb": "scene-000002/scene-000002-f000000-i014.rgb.png"
+      },
+      "frame_index": 0,
+      "id": "scene-000002-f000000-i014",
+      "instance_id": 14,
+      "job_id": "scene-000002",
+      "keypoints": [
+        [
+          320.317,
+          183.835,
+          1
+        ],
+        [
+          308.165,
+          250.666,
+          2
+        ],
+        [
+          367.63,
+          290.097,
+          2
+        ],
+        [
+          458.481,
+          292.952,
+          2
+        ],
+        [
+          529.263,
+          255.138,
+          2
+        ],
+        [
+          257.816,
+          259.357,
+          2
+        ],
+        [
+          248.625,
+          292.81,
+          2
+        ],
+        [
+          225.954,
+          281.023,
+          2
+        ],
+        [
+          359.945,
+          402.826,
+          2
+        ],
+        [
+          444.925,
+          456.268,
+          2
+        ],
+        [
+          430.449,
+          567.613,
+          2
+        ],
+        [
+          307.731,
+          387.593,
+          2
+        ],
+        [
+          347.919,
+          437.684,
+          2
+        ],
+        [
+          293.482,
+          537.317,
+          2
+        ],
+        [
+          325.769,
+          180.293,
+          1
+        ],
+        [
+          308.13,
+          175.534,
+          1
+        ],
+        [
+          321.767,
+          206.127,
+          2
+        ],
+        [
+          276.703,
+          193.844,
+          1
+        ]
+      ],
+      "label": "player",
+      "scale": 5.052631578947368,
+      "source_rgb": "scene-000002/frame-000000.png",
+      "visible_area": 2065
+    }
+  ],
+  "dilate_px": 9,
+  "keypoint_names": [
+    "nose",
+    "neck",
+    "right_shoulder",
+    "right_elbow",
+    "right_wrist",
+    "left_shoulder",
+    "left_elbow",
+    "left_wrist",
+    "right_hip",
+    "right_knee",
+    "right_ankle",
+    "left_hip",
+    "left_knee",
+    "left_ankle",
+    "right_eye",
+    "left_eye",
+    "right_ear",
+    "left_ear"
+  ],
+  "margin": 0.35,
+  "min_height": 24,
+  "note": "Generated images may only change pixels inside inpaint.png; labels remain the renderer's ground truth.",
+  "pose_format": "openpose-18",
+  "schema_version": "1.0",
+  "size": 768
+}
