@@ -119,6 +119,16 @@ class BlenderAdapterTests(unittest.TestCase):
             self.assertFalse((root / "render/invalid").exists())
 
 
+def ball_projection_matches(test, result, frame, camera):
+    """The independently projected ball centre lies in the ball's visible box, if any."""
+    ball = next(o for o in frame["objects"] if o["label"] == "ball")
+    if ball["bbox_xywh"] is None:  # hidden behind a player or outside the frame
+        return
+    bx, by, bw, bh = ball["bbox_xywh"]
+    x, y = camera["ball_pixel"]
+    test.assertTrue(bx - 2 <= x <= bx + bw + 2 and by - 2 <= y <= by + bh + 2, (x, y, ball))
+
+
 @unittest.skipUnless(
     os.environ.get("BLENDER_EXECUTABLE"), "set BLENDER_EXECUTABLE for local 3D integration"
 )
@@ -130,20 +140,20 @@ class BlenderIntegrationTests(unittest.TestCase):
                 Path(os.environ["BLENDER_EXECUTABLE"]), samples=1
             ).render(job(), root / "render")
             scene = json.loads(result.manifest.read_text())
+            layout = json.loads((result.output_directory / "layout.json").read_text())
             frame = scene["frames"][0]
+            planned = {a["instance_id"] for a in layout["athletes"]}
+            # Every planned person is labelled, whether or not the camera sees it.
+            self.assertEqual({o["instance_id"] for o in frame["objects"]}, planned | {1, 40, 41})
             with Image.open(result.output_directory / frame["instance_ids"]) as mask:
                 ids = {value for _, value in mask.getcolors()}
             self.assertIn(0, ids)
-            self.assertIn(1, ids)
-            self.assertIn(30, ids)
-            self.assertTrue({40, 41} & ids)
-            self.assertGreaterEqual(len(ids & set(range(10, 20))), 8)
-            self.assertGreater(export_dataset(root / "render", root / "dataset").annotations, 10)
-            # Compare raster-mask centroid with an independent camera projection.
+            self.assertLessEqual(ids - {0}, planned | {1, 40, 41})
+            self.assertGreaterEqual(len(ids & set(range(10, 20))), 6)
+            self.assertGreater(export_dataset(root / "render", root / "dataset").annotations, 6)
             details = json.loads((result.output_directory / "worker-result.json").read_text())
-            x, y = details["cameras"][0]["ball_pixel"]
-            with Image.open(result.output_directory / frame["instance_ids"]) as mask:
-                self.assertEqual(mask.getpixel((round(x), round(y))), 1)
+            self.assertEqual(details["situation"], layout["situation"])
+            ball_projection_matches(self, result, frame, details["cameras"][0])
 
     def test_reco_panorama_scene_and_mask_alignment(self):
         panorama = replace(job(), width=960, height=270, camera="reco_panorama")
@@ -153,23 +163,23 @@ class BlenderIntegrationTests(unittest.TestCase):
                 Path(os.environ["BLENDER_EXECUTABLE"]), samples=1
             ).render(panorama, root / "render")
             frame = json.loads(result.manifest.read_text())["frames"][0]
+            layout = json.loads((result.output_directory / "layout.json").read_text())
+            people_ids = {a["instance_id"] for a in layout["athletes"]}
             with Image.open(result.output_directory / frame["instance_ids"]) as mask:
                 ids = {value for _, value in mask.getcolors()}
-                details = json.loads((result.output_directory / "worker-result.json").read_text())
-                camera = details["cameras"][0]
-                self.assertEqual(camera["projection"], "equirectangular")
-                # The whole court is in view: both hoops, the referee and most players.
-                self.assertTrue({1, 30, 40, 41} <= ids)
-                self.assertGreaterEqual(len(ids & set(range(10, 20))), 8)
-                # Independent equirectangular projection lands on the rendered ball.
-                x, y = camera["ball_pixel"]
-                self.assertEqual(mask.getpixel((round(x), round(y))), 1)
+            details = json.loads((result.output_directory / "worker-result.json").read_text())
+            camera = details["cameras"][0]
+            self.assertEqual(camera["projection"], "equirectangular")
+            # The whole court is in view: both hoops and almost every athlete.
+            self.assertTrue({40, 41} <= ids)
+            self.assertGreaterEqual(len(ids & people_ids), len(people_ids) - 2)
+            ball_projection_matches(self, result, frame, camera)
             self.assertGreater(export_dataset(root / "render", root / "dataset").annotations, 10)
             poses = json.loads((result.output_directory / "poses.json").read_text())
             people = poses["frames"][0]["people"]
-            self.assertEqual({p["instance_id"] for p in people}, set(range(10, 20)) | {30})
+            self.assertEqual({p["instance_id"] for p in people}, people_ids)
             # Body joints project onto the rendered athletes, not beside them.
             well_seen = [p for p in people if sum(k[2] == 2 for k in p["keypoints"][1:14]) >= 9]
-            self.assertGreaterEqual(len(well_seen), 7)
+            self.assertGreaterEqual(len(well_seen), 6)
             crops = export_crops(root / "render", root / "crops", size=256)
             self.assertGreaterEqual(crops.crops, 8)

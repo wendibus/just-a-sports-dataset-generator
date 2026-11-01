@@ -114,11 +114,11 @@ def text_object(body, location, scale, mat, rotation=(math.pi / 2, 0, 0), identi
     return finish(obj, obj.name, mat, identity, parent)
 
 
-def wood_material():
-    mat = material("Maple varnish, procedural grain", (0.65, 0.39, 0.16), 0.29)
+def wood_material(color, gloss):
+    mat = material("Maple varnish, procedural grain", color, 0.29)
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
     shader = nodes.get("Principled BSDF")
-    shader.inputs["Coat Weight"].default_value = 0.22
+    shader.inputs["Coat Weight"].default_value = gloss
     coord = nodes.new("ShaderNodeTexCoord")
     scale = nodes.new("ShaderNodeVectorMath")
     scale.operation = "MULTIPLY"
@@ -129,8 +129,8 @@ def wood_material():
     noise.inputs["Detail"].default_value = 3
     links.new(scale.outputs["Vector"], noise.inputs["Vector"])
     ramp = nodes.new("ShaderNodeValToRGB")
-    ramp.color_ramp.elements[0].color = (0.28, 0.13, 0.045, 1)
-    ramp.color_ramp.elements[1].color = (0.78, 0.56, 0.30, 1)
+    ramp.color_ramp.elements[0].color = (*(c * 0.42 for c in color), 1)
+    ramp.color_ramp.elements[1].color = (*(min(c * 1.2, 1) for c in color), 1)
     links.new(noise.outputs["Fac"], ramp.inputs[0])
     links.new(ramp.outputs[0], shader.inputs["Base Color"])
     bump = nodes.new("ShaderNodeBump")
@@ -141,15 +141,23 @@ def wood_material():
     return mat
 
 
-def arena(rng):
-    white = material("Court paint ivory", (0.90, 0.91, 0.86), 0.38)
-    navy = material("Home navy paint", (0.018, 0.055, 0.10), 0.38)
-    concrete = material("Warm concrete", (0.28, 0.30, 0.32), 0.8)
+SEAT_ROWS, SEAT_COLUMNS = 4, 42
+
+
+def seat_position(row, col):
+    return -16.4 + col * 0.8, 10.4 + row * 0.82, 0.30 + row * 0.43
+
+
+def arena(hall):
+    """Court, stands, walls and lights; all colours and light settings come from the layout."""
+    white = material("Court lines", tuple(hall["line_color"]), 0.38)
+    key = material("Painted key", tuple(hall["key_color"]), 0.38)
+    concrete = material("Wall", tuple(hall["wall_color"]), 0.8)
     steel = material("Powder coated steel", (0.08, 0.10, 0.13), 0.5, 0.35)
-    oak = wood_material()
+    oak = wood_material(tuple(hall["floor_color"]), hall["floor_gloss"])
     box("Wood court", (0, 0, -0.11), (34, 22, 0.2), oak)
     # Fine plank seams, all coplanar and outside the annotation classes.
-    seam = material("Fine wood joints", (0.23, 0.12, 0.05), 0.8)
+    seam = material("Fine wood joints", tuple(c * 0.35 for c in hall["floor_color"]), 0.8)
     for row in range(55):
         y = -10.8 + row * 0.4
         line("Maple board joint", [(-17, y, -0.008), (17, y, -0.008)], seam, 0.003)
@@ -157,7 +165,7 @@ def arena(rng):
             x = -16 + col * 4 + (row % 3) * 1.2
             line("Staggered board end", [(x, y, -0.007), (x, y + 0.4, -0.007)], seam, 0.002)
     for sign in (-1, 1):
-        box("Painted key", (sign * 11.1, 0, 0.001), (5.8, 4.9, 0.004), navy)
+        box("Painted key", (sign * 11.1, 0, 0.001), (5.8, 4.9, 0.004), key)
         line(
             "Key boundary",
             [
@@ -193,19 +201,16 @@ def arena(rng):
     )
     line("Half court", [(0, -7.5, 0.012), (0, 7.5, 0.012)], white)
     circle("Center circle", (0, 0, 0.012), 1.8, white)
-    text_object("BASKETBALL", (0, 8.0, 0.016), 0.55, navy, rotation=(0, 0, 0))
+    text_object("BASKETBALL", (0, 8.0, 0.016), 0.55, key, rotation=(0, 0, 0))
     box("Far wall", (0, 15, 5.5), (42, 0.3, 11), concrete)
     for sign in (-1, 1):
         box("End wall", (sign * 21, 0, 5.5), (0.3, 30, 11), concrete)
-    seats = [
-        material("Seat blue", (0.035, 0.12, 0.22), 0.5),
-        material("Seat pale", (0.46, 0.49, 0.51), 0.65),
-    ]
-    for row in range(4):
-        y, z = 10.4 + row * 0.82, 0.30 + row * 0.43
+    seats = [material("Seat", tuple(color), 0.55) for color in hall["seat_colors"]]
+    for row in range(SEAT_ROWS):
+        _x, y, z = seat_position(row, 0)
         box("Stand tier", (0, y, z * 0.5), (34, 0.86, z), concrete)
-        for col in range(42):
-            x = -16.4 + col * 0.8
+        for col in range(SEAT_COLUMNS):
+            x, y, z = seat_position(row, col)
             mat = seats[(row + col // 5) % 2]
             box("Seat", (x, y, z + 0.26), (0.62, 0.52, 0.1), mat, bevel=0.04)
             box("Seat back", (x, y + 0.24, z + 0.53), (0.62, 0.09, 0.50), mat, bevel=0.04)
@@ -214,17 +219,90 @@ def arena(rng):
         box("Wall column", (x, 14.6, 5), (0.26, 0.32, 10), steel)
     black = material("Scoreboard", (0.006, 0.009, 0.015), 0.7)
     box("Scoreboard", (0, 14.7, 6.1), (5, 0.16, 2.0), black, bevel=0.08)
-    text_object("HOME   48 : 42   AWAY", (0, 14.58, 6.45), 0.32, white)
-    text_object("03:24     Q3", (0, 14.57, 5.6), 0.45, white)
+    score = random.Random(hall["spectator_seed"])
+    text_object(
+        f"HOME   {score.randrange(10, 90)} : {score.randrange(10, 90)}   AWAY",
+        (0, 14.58, 6.45),
+        0.32,
+        white,
+    )
+    text_object(
+        f"{score.randrange(0, 10):02d}:{score.randrange(0, 60):02d}     Q{score.randrange(1, 5)}",
+        (0, 14.57, 5.6),
+        0.45,
+        white,
+    )
+    rows = hall["light_rows"]
     for x in (-10, 0, 10):
-        for y in (-5, 5):
+        for k in range(rows):
+            y = -5 + 10 * k / (rows - 1)
             data = bpy.data.lights.new("Arena softbox", "AREA")
-            data.energy = rng.uniform(1600, 2000)
+            data.energy = hall["light_energy"] * 2 / rows
+            data.use_temperature = True
+            data.temperature = hall["light_kelvin"]
             data.shape, data.size, data.size_y = "RECTANGLE", 5, 2
             obj = bpy.data.objects.new("Arena softbox", data)
             bpy.context.collection.objects.link(obj)
             obj.location = (x, y, 9)
-    return white, navy, steel
+    spectators(hall)
+    return white, steel
+
+
+def shared_mesh(kind):
+    """Mesh data for many identical background objects, with one material slot."""
+    if kind == "cube":
+        bpy.ops.mesh.primitive_cube_add(size=1)
+    else:
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8)
+    template = bpy.context.object
+    mesh = template.data
+    mesh.materials.append(None)
+    bpy.data.objects.remove(template)
+    return mesh
+
+
+def spectators(hall):
+    """Seated spectators on the stands. They are background (ID 0), not labelled people."""
+    if hall["spectator_density"] <= 0:
+        return
+    rng = random.Random(hall["spectator_seed"])
+    torso_mesh, head_mesh = shared_mesh("cube"), shared_mesh("sphere")
+    shirts = [
+        material("Spectator shirt", tuple(rng.uniform(0.02, 0.8) for _ in range(3)), 0.8)
+        for _ in range(10)
+    ]
+    skins = [
+        material("Spectator skin", color, 0.55)
+        for color in ((0.40, 0.20, 0.10), (0.18, 0.075, 0.035), (0.68, 0.40, 0.23))
+    ]
+
+    def place(name, mesh, location, scale, mat):
+        obj = bpy.data.objects.new(name, mesh)
+        bpy.context.collection.objects.link(obj)
+        obj.location, obj.scale, obj.pass_index = location, scale, 0
+        obj.material_slots[0].link = "OBJECT"  # own colour, shared geometry
+        obj.material_slots[0].material = mat
+
+    for row in range(SEAT_ROWS):
+        for col in range(SEAT_COLUMNS):
+            if rng.random() >= hall["spectator_density"]:
+                continue
+            x, y, z = seat_position(row, col)
+            x += rng.uniform(-0.08, 0.08)
+            place(
+                "Spectator",
+                torso_mesh,
+                (x, y + 0.05, z + 0.62),
+                (0.42, 0.26, 0.6),
+                rng.choice(shirts),
+            )
+            place(
+                "Spectator head",
+                head_mesh,
+                (x, y + 0.02, z + 1.05),
+                (0.1, 0.11, 0.13),
+                rng.choice(skins),
+            )
 
 
 def hoop(sign, identity, white, steel):
@@ -273,7 +351,7 @@ def hoop(sign, identity, white, steel):
     limb("Backboard support", (sign * 15, 0, 4.5), (sign * 12.9, 0, 3.65), 0.10, 0.10, steel)
 
 
-def jersey_mesh(mat, identity, root):
+def jersey_mesh(mat, identity, root, drop):
     rings = [
         (0.92, 0.20, 0.13),
         (1.08, 0.20, 0.135),
@@ -282,7 +360,7 @@ def jersey_mesh(mat, identity, root):
         (1.57, 0.17, 0.11),
     ]
     vertices = [
-        (math.cos(i * math.tau / 24) * rx, math.sin(i * math.tau / 24) * ry, z)
+        (math.cos(i * math.tau / 24) * rx, math.sin(i * math.tau / 24) * ry, z - drop)
         for z, rx, ry in rings
         for i in range(24)
     ]
@@ -328,47 +406,61 @@ OPENPOSE_18 = (
 SKELETONS = {}
 
 
-def athlete(identity, team, position, heading, pose, rng, number):
-    joints = {"nose": (0, -0.102, 1.80), "neck": (0, 0, 1.58)}
-    root = bpy.data.objects.new("Referee" if team == 2 else f"Player {number}", None)
+def along(a, b, t):
+    return tuple(a[k] + (b[k] - a[k]) * t for k in range(3))
+
+
+def athlete(plan):
+    """Build one athlete from the planned skeleton; the root follows the planned frames."""
+    identity, team, joints = plan["instance_id"], plan["team"], plan["joints"]
+    j = {name: tuple(value) for name, value in joints.items()}
+    drop = plan["pose"]["crouch"]
+    root = bpy.data.objects.new("Referee" if team == 2 else f"Player {plan['number']}", None)
     bpy.context.collection.objects.link(root)
-    root.location, root.rotation_euler.z = position, heading
-    root.scale = (1, 1, rng.uniform(0.97, 1.10))
-    skins = [(0.40, 0.20, 0.10), (0.18, 0.075, 0.035), (0.68, 0.40, 0.23), (0.33, 0.15, 0.07)]
-    skin = material("Skin", rng.choice(skins), 0.53)
+    skin = material("Skin", tuple(plan["skin"]), 0.53)
     skin.node_tree.nodes.get("Principled BSDF").inputs["Subsurface Weight"].default_value = 0.08
-    colors = [(0.025, 0.13, 0.62), (0.86, 0.09, 0.035), (0.50, 0.52, 0.53)]
-    kit = material("Basketball fabric", colors[team], 0.82)
+    kit = material("Basketball fabric", tuple(plan["kit"]), 0.82)
     dark = material("Hair / shoes", (0.018, 0.012, 0.009), 0.7)
-    white = material("Socks and jersey lettering", (0.88, 0.88, 0.82), 0.8)
+    light = 0.88 if sum(plan["kit"]) < 1.8 else 0.05  # lettering contrasts with the kit
+    white = material("Socks and lettering", (light, light, light * 0.93), 0.8)
+    socks = material("Socks", (0.88, 0.88, 0.82), 0.8)
     shorts = kit if team < 2 else dark
-    jersey_mesh(kit, identity, root)
-    oval("Neck", (0, 0, 1.62), (0.075, 0.075, 0.11), skin, identity, root)
-    oval("Head", (0, -0.005, 1.80), (0.103, 0.098, 0.143), skin, identity, root)
-    oval("Short hair", (0, 0.008, 1.875), (0.105, 0.094, 0.076), dark, identity, root)
-    oval("Nose", (0, -0.102, 1.80), (0.020, 0.028, 0.033), skin, identity, root)
-    for side in (-1, 1):
-        oval("Ear", (side * 0.102, 0, 1.79), (0.018, 0.025, 0.040), skin, identity, root)
-        oval("Eye", (side * 0.040, -0.092, 1.83), (0.016, 0.008, 0.009), white, identity, root)
-        oval("Iris", (side * 0.040, -0.100, 1.83), (0.007, 0.003, 0.007), dark, identity, root)
-        stride = (0.16 if side == 1 else -0.17) * (1 if pose != "defend" else 0.5)
-        hip = (side * 0.12, 0, 0.97)
-        knee = (side * (0.20 if pose == "defend" else 0.14), stride, 0.52)
-        ankle = (side * (0.31 if pose == "defend" else 0.18), -stride, 0.13)
-        limb(
-            "Shorts leg",
-            hip,
-            (side * 0.16, stride * 0.4, 0.73),
-            0.14,
-            0.145,
-            shorts,
+    jersey_mesh(kit, identity, root, drop)
+    neck = j["neck"]
+    oval("Neck", (neck[0], neck[1], neck[2] + 0.04), (0.075, 0.075, 0.11), skin, identity, root)
+    head = j["head"]
+    oval("Head", head, (0.103, 0.098, 0.143), skin, identity, root)
+    if plan["hair"] == "short":
+        oval(
+            "Short hair",
+            (head[0], head[1] + 0.013, head[2] + 0.075),
+            (0.105, 0.094, 0.076),
+            dark,
             identity,
             root,
         )
-        limb("Thigh", (side * 0.16, stride * 0.4, 0.75), knee, 0.11, 0.080, skin, identity, root)
+    elif plan["hair"] == "long":
+        oval(
+            "Long hair",
+            (head[0], head[1] + 0.03, head[2] + 0.02),
+            (0.115, 0.11, 0.15),
+            dark,
+            identity,
+            root,
+        )
+    oval("Nose", j["nose"], (0.020, 0.028, 0.033), skin, identity, root)
+    for prefix in ("right", "left"):
+        oval("Ear", j[f"{prefix}_ear"], (0.018, 0.025, 0.040), skin, identity, root)
+        eye = j[f"{prefix}_eye"]
+        oval("Eye", eye, (0.016, 0.008, 0.009), socks, identity, root)
+        oval("Iris", (eye[0], eye[1] - 0.008, eye[2]), (0.007, 0.003, 0.007), dark, identity, root)
+        hip, knee, ankle = j[f"{prefix}_hip"], j[f"{prefix}_knee"], j[f"{prefix}_ankle"]
+        thigh_split = along(hip, knee, 0.45)
+        limb("Shorts leg", hip, thigh_split, 0.14, 0.13, shorts, identity, root)
+        limb("Thigh", thigh_split, knee, 0.105, 0.080, skin, identity, root)
         oval("Knee", knee, (0.078, 0.078, 0.082), skin, identity, root)
         limb("Calf", knee, ankle, 0.075, 0.045, skin, identity, root)
-        limb("Sock", (ankle[0], ankle[1], 0.28), ankle, 0.050, 0.047, white, identity, root)
+        limb("Sock", along(ankle, knee, 0.4), ankle, 0.050, 0.047, socks, identity, root)
         oval(
             "Shoe", (ankle[0], ankle[1] - 0.060, 0.065), (0.067, 0.145, 0.065), dark, identity, root
         )
@@ -376,54 +468,41 @@ def athlete(identity, team, position, heading, pose, rng, number):
             "Shoe sole",
             (ankle[0], ankle[1] - 0.06, 0.026),
             (0.13, 0.26, 0.033),
-            white,
+            socks,
             identity,
             root,
             0.014,
         )
-        shoulder = (side * 0.25, 0, 1.48)
-        if pose == "defend":
-            elbow, hand = (side * 0.49, -0.04, 1.40), (side * 0.62, -0.18, 1.65)
-        elif pose == "shoot":
-            elbow, hand = (side * 0.25, -0.17, 1.75), (side * 0.10, -0.27, 2.02)
-        else:
-            elbow, hand = (side * 0.36, -0.09, 1.18), (side * 0.49, -0.31, 0.87)
+        shoulder, elbow, wrist = j[f"{prefix}_shoulder"], j[f"{prefix}_elbow"], j[f"{prefix}_wrist"]
         oval("Shoulder", shoulder, (0.098, 0.098, 0.11), skin, identity, root)
         limb("Upper arm", shoulder, elbow, 0.083, 0.061, skin, identity, root)
         oval("Elbow", elbow, (0.061, 0.061, 0.061), skin, identity, root)
-        limb("Forearm", elbow, hand, 0.061, 0.035, skin, identity, root)
-        oval("Hand", hand, (0.050, 0.027, 0.077), skin, identity, root)
-        prefix = "right" if side == -1 else "left"
-        joints |= {
-            f"{prefix}_shoulder": shoulder,
-            f"{prefix}_elbow": elbow,
-            f"{prefix}_wrist": hand,
-            f"{prefix}_hip": hip,
-            f"{prefix}_knee": knee,
-            f"{prefix}_ankle": ankle,
-            f"{prefix}_eye": (side * 0.040, -0.092, 1.83),
-            f"{prefix}_ear": (side * 0.102, 0, 1.79),
-        }
-        for finger in range(4):
-            start = (hand[0] + (finger - 1.5) * 0.019, hand[1], hand[2] - 0.045)
-            end = (start[0], start[1] - 0.012, start[2] - 0.055)
-            limb("Finger", start, end, 0.009, 0.007, skin, identity, root)
+        limb("Forearm", elbow, wrist, 0.061, 0.035, skin, identity, root)
+        direction = Vector(wrist) - Vector(elbow)
+        direction.normalize()
+        palm = Vector(wrist) + direction * 0.05
+        hand = limb(
+            "Hand", wrist, tuple(palm + direction * 0.04), 0.045, 0.04, skin, identity, root
+        )
+        hand.scale = (1, 0.6, 1)
+    torso_z = 1.20 - drop
     if team < 2:
-        text_object(str(number), (0, -0.153, 1.20), 0.19, white, identity=identity, parent=root)
         text_object(
-            str(number),
-            (0, 0.155, 1.20),
+            str(plan["number"]), (0, -0.153, torso_z), 0.19, white, identity=identity, parent=root
+        )
+        text_object(
+            str(plan["number"]),
+            (0, 0.155, torso_z),
             0.21,
             white,
             rotation=(math.pi / 2, 0, math.pi),
             identity=identity,
             parent=root,
         )
-        # Narrow side panels tie upper and lower uniform together.
         for side in (-1, 1):
             line(
                 "Uniform trim",
-                [(side * 0.203, 0, 0.96), (side * 0.25, 0, 1.44)],
+                [(side * 0.203, 0, 0.96 - drop), (side * 0.25, 0, 1.44 - drop)],
                 white,
                 0.012,
                 identity,
@@ -433,17 +512,23 @@ def athlete(identity, team, position, heading, pose, rng, number):
         for x in (-0.15, -0.075, 0, 0.075, 0.15):
             line(
                 "Referee stripe",
-                [(x, -0.139, 1.02), (x, -0.151, 1.45)],
+                [(x, -0.139, 1.02 - drop), (x, -0.151, 1.45 - drop)],
                 dark,
                 0.014,
                 identity,
                 root,
             )
-    SKELETONS[identity] = (root, {name: joints[name] for name in OPENPOSE_18})
+    SKELETONS[identity] = (root, {name: j[name] for name in OPENPOSE_18})
     return root
 
 
-def ball(position):
+def place_athlete(root, frame):
+    root.location = tuple(frame["position"])
+    root.rotation_euler = (0, 0, frame["heading"])
+    root.scale = (1, 1, frame["height_scale"])
+
+
+def ball():
     orange = material("Basketball leather", (0.72, 0.19, 0.027), 0.78)
     nodes, links = orange.node_tree.nodes, orange.node_tree.links
     noise = nodes.new("ShaderNodeTexNoise")
@@ -455,7 +540,6 @@ def ball(position):
     links.new(bump.outputs[0], nodes.get("Principled BSDF").inputs["Normal"])
     root = bpy.data.objects.new("Ball root", None)
     bpy.context.collection.objects.link(root)
-    root.location = position
     oval("Basketball", (0, 0, 0), (0.12,) * 3, orange, 1, root)
     seam = material("Ball seams", (0.014, 0.010, 0.008), 0.9)
     for axis in range(3):
@@ -518,12 +602,13 @@ COURT_HALF_WIDTH = 7.5
 BACKBOARD_X, BACKBOARD_TOP = 12.8, 3.95  # matches hoop() geometry
 
 
-def broadcast_camera(camera, rng, mirrored):
-    """Elevated sideline perspective camera; drifts slightly per frame."""
+def broadcast_camera(camera, rng, focus_x):
+    """Elevated sideline perspective camera aimed at the action; drifts slightly per frame."""
     camera.data.type = "PERSP"
     camera.data.lens, camera.data.sensor_width = 35, 36
-    base = (mirrored * rng.uniform(-1, 2), -rng.uniform(19, 22), rng.uniform(9, 11))
-    target = Vector((mirrored * 5, 0, 1.35))
+    focus_x = max(min(focus_x, 8.0), -8.0)
+    base = (focus_x * 0.6 + rng.uniform(-1.5, 1.5), -rng.uniform(19, 22), rng.uniform(9, 11))
+    target = Vector((focus_x, 0, 1.35))
 
     def place(frame):
         camera.location = (base[0] + frame * 0.12, base[1], base[2])
@@ -670,37 +755,19 @@ def main():
         1,
     )
     scene.world.node_tree.nodes.get("Background").inputs["Strength"].default_value = 0.32
-    white, _navy, steel = arena(rng)
+    layout = settings["layout"]
+    white, steel = arena(layout["hall"])
     hoop(-1, 40, white, steel)
     hoop(1, 41, white, steel)
-    offense = [(3.5, -2.8), (8.0, -4.8), (10.0, 2.8), (6.0, 4.6), (1.0, 1.5)]
-    defense = [(5.0, -2.0), (8.9, -3.9), (10.6, 1.5), (7.0, 3.7), (3.5, 1.7)]
-    players = []
-    mirrored = -1 if job["scene_index"] % 2 else 1
-    for index, (x, y) in enumerate(offense + defense):
-        position = (mirrored * (x + rng.uniform(-0.35, 0.35)), y + rng.uniform(-0.35, 0.35), 0)
-        heading = rng.uniform(-0.4, 0.4) + (math.pi / 2 if mirrored == 1 else -math.pi / 2)
-        players.append(
-            athlete(
-                10 + index,
-                index // 5,
-                position,
-                heading,
-                "dribble" if index == 0 else "defend" if index >= 5 else "run",
-                rng,
-                (index % 5) * 3 + 4,
-            )
-        )
-    athlete(30, 2, (mirrored * 3, -5.8, 0), math.pi / 2, "run", rng, 0)
-    bpy.context.view_layer.update()
-    ball_root = ball(players[0].matrix_world @ Vector((-mirrored * 0.49, -0.31, 0.50)))
+    athletes = [(plan, athlete(plan)) for plan in layout["athletes"]]
+    ball_root = ball()
     preset = job.get("camera", "broadcast")
     camera_data = bpy.data.cameras.new("Dataset camera")
     camera = bpy.data.objects.new("Dataset camera", camera_data)
     bpy.context.collection.objects.link(camera)
     scene.camera = camera
     if preset == "broadcast":
-        place_camera, camera_info = broadcast_camera(camera, rng, mirrored)
+        place_camera, camera_info = broadcast_camera(camera, rng, layout["focus_x"])
     elif preset == "reco_panorama":
         place_camera, camera_info = reco_panorama_camera(camera, rng, job["width"], job["height"])
     else:
@@ -708,17 +775,26 @@ def main():
     mask_dir = output / "id-pass"
     mask_dir.mkdir()
     mask_output(scene, mask_dir)
+    classes = {"ball": 0, "player": 1, "referee": 2, "hoop": 3}
     identities = [{"instance_id": 1, "class_id": 0, "label": "ball"}]
-    identities += [{"instance_id": 10 + i, "class_id": 1, "label": "player"} for i in range(10)]
-    identities += [{"instance_id": 30, "class_id": 2, "label": "referee"}]
+    identities += [
+        {
+            "instance_id": plan["instance_id"],
+            "class_id": classes[plan["label"]],
+            "label": plan["label"],
+        }
+        for plan in layout["athletes"]
+    ]
     identities += [{"instance_id": i, "class_id": 3, "label": "hoop"} for i in (40, 41)]
     frames, cameras = [], []
     started = time.monotonic()
     for frame in range(settings["frames"]):
         scene.frame_set(frame + 1)
         place_camera(frame)
+        for plan, root in athletes:
+            place_athlete(root, plan["frames"][frame])
+        ball_root.location = tuple(layout["ball"]["positions"][frame])
         bpy.context.view_layer.update()
-        ball_root.location.z += 0.045 if frame % 2 else 0
         stem = f"frame-{frame:06d}"
         scene.render.filepath = str(output / (stem + ".png"))
         bpy.ops.render.render(write_still=True)
@@ -762,9 +838,11 @@ def main():
                 "cameras": cameras,
                 "elapsed_seconds": time.monotonic() - started,
                 "annotation_pass": "Object Index; no antialiasing",
+                "situation": layout["situation"],
+                "ball_event": layout["ball"]["event"],
                 "limitations": [
                     "Procedural athletes; realism and training benefit not validated",
-                    "Static poses; no motion capture",
+                    "One pose per athlete and scene; athletes glide between frames",
                     "Opaque practice backboards",
                 ],
             },
