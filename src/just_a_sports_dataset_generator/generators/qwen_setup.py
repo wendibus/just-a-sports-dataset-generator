@@ -397,7 +397,19 @@ def _download(
 def _pip_install(interpreter: Path, packages: tuple[str, ...], log_path: Path) -> None:
     with log_path.open("w", encoding="utf-8") as log:
         result = subprocess.run(
-            [str(interpreter), "-m", "pip", "install", "--disable-pip-version-check", *packages],
+            [
+                str(interpreter),
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                # Slow or flaky connections: wait longer and retry instead of failing.
+                "--timeout",
+                "120",
+                "--retries",
+                "10",
+                *packages,
+            ],
             stdout=log,
             stderr=subprocess.STDOUT,
             check=False,
