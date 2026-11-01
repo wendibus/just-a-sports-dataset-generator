@@ -19,7 +19,14 @@ from pathlib import Path
 
 from just_a_sports_dataset_generator.storage import write_json
 
-from .qwen_setup import InstallPlan, SetupError, install, installed, plan_install
+from .qwen_setup import (
+    InstallPlan,
+    SetupError,
+    install,
+    installed,
+    plan_install,
+    update_packages,
+)
 
 WORKER = Path(__file__).with_name("qwen_worker.py")
 
@@ -41,7 +48,7 @@ def ensure_installed(
     """Return the install manifest, installing first if the user approves the plan."""
     manifest = installed(home)
     if manifest is not None:
-        return manifest
+        return update_packages(home, progress)
     plan = plan_install(quant, home)
     if not confirm(plan):
         raise SetupError("Qwen ist nicht installiert und die Installation wurde abgelehnt")

@@ -17,7 +17,7 @@ from test_crops import render
 from just_a_sports_dataset_generator.cli import main
 from just_a_sports_dataset_generator.crops import export_crops
 from just_a_sports_dataset_generator.generators.qwen import generate_crops
-from just_a_sports_dataset_generator.generators.qwen_setup import SetupError
+from just_a_sports_dataset_generator.generators.qwen_setup import PACKAGES, SetupError
 
 FAKE_TORCH = """
 bfloat16 = "bfloat16"
@@ -115,7 +115,7 @@ def fake_runtime(home: Path) -> None:
         "schema_version": "1.0",
         "model": "Qwen-Image-Edit-2511",
         "quant": "Q4_K_M",
-        "packages": ["fake"],
+        "packages": list(PACKAGES),
         "python": str(python),
         "base_dir": str(base),
         "gguf": str(qwen / "models/q.gguf"),
@@ -229,6 +229,25 @@ class QwenGenerateTests(unittest.TestCase):
         self.assertIn("Qwen-Image-Edit-2511", report["generator"])
         self.assertEqual(len(report["items"]), 2)
         self.assertTrue((output / "render/scene-000000/scene.json").is_file())
+
+    def test_an_outdated_runtime_gets_the_pinned_packages_without_a_new_download(self):
+        manifest_path = self.home / "qwen/installed.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["packages"] = [p for p in PACKAGES if not p.startswith("torchvision")]
+        manifest_path.write_text(json.dumps(manifest))
+        calls = []
+        with patch(
+            "just_a_sports_dataset_generator.generators.qwen_setup._pip_install",
+            side_effect=lambda python, packages, log: calls.append((python, packages)),
+        ):
+            result = generate_crops(
+                self.root / "crops", self.root / "gen", confirm=never, progress=lambda _: None
+            )
+        self.assertEqual(result.generated, 2)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], Path(manifest["python"]))
+        self.assertIn("torchvision==0.24.1", calls[0][1])
+        self.assertEqual(json.loads(manifest_path.read_text())["packages"], list(PACKAGES))
 
 
 if __name__ == "__main__":

@@ -180,7 +180,9 @@ class QwenSetupTests(unittest.TestCase):
         self.assertFalse((base / "README.md").exists())
         self.assertFalse((self.home / "qwen/downloads").exists())
         # Already installed: no second consent request.
-        self.assertEqual(ensure_installed(lambda plan: False), manifest)
+        # Packages match the (empty) test plan, so nothing is installed or asked again.
+        with patch("just_a_sports_dataset_generator.generators.qwen_setup.PACKAGES", ()):
+            self.assertEqual(ensure_installed(lambda plan: False), manifest)
 
     def test_checksum_mismatch_aborts_without_a_manifest(self):
         FakeHub.corrupt = "qwen-image-edit-2511-Q4_K_M.gguf"
