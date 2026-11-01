@@ -125,8 +125,9 @@ check is a filter on generated pixels, never a source of labels.
 
 ## Limits
 
-- Joints come from the procedural athletes (no rig), so the poses are as limited as
-  their three static stances.
+- Joints come from the planner's procedural pose families and motion model (see
+  [scene variety](BASKETBALL.md#scene-variety)); there is no motion capture and the
+  torso does not bend or twist.
 - Self-occlusion is modelled only for face points; a forearm behind the torso of the
   same person still counts as visible.
 - Upscaling a 40-pixel panorama player to 1024 pixels gives the generator a blurry

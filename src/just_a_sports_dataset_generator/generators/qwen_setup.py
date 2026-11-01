@@ -39,6 +39,9 @@ LORA_FILE = "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"
 # Versions reported working together for GGUF Qwen-Image-Edit-2511 in diffusers (late 2025).
 PACKAGES = (
     "torch==2.9.1",
+    # Qwen2.5-VL's processor loads a video processor that needs torchvision; 0.24.1 is the
+    # release built against torch 2.9.1 (it pins torch==2.9.1).
+    "torchvision==0.24.1",
     "diffusers==0.36.0",
     "transformers==4.57.3",
     "accelerate==1.12.0",
@@ -394,13 +397,44 @@ def _download(
 def _pip_install(interpreter: Path, packages: tuple[str, ...], log_path: Path) -> None:
     with log_path.open("w", encoding="utf-8") as log:
         result = subprocess.run(
-            [str(interpreter), "-m", "pip", "install", "--disable-pip-version-check", *packages],
+            [
+                str(interpreter),
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                # Slow or flaky connections: wait longer and retry instead of failing.
+                "--timeout",
+                "120",
+                "--retries",
+                "10",
+                *packages,
+            ],
             stdout=log,
             stderr=subprocess.STDOUT,
             check=False,
         )
     if result.returncode:
         raise SetupError(f"package installation failed; see {log_path}")
+
+
+def update_packages(home: Path | None, progress: Callable[[str], None]) -> dict[str, object]:
+    """Bring an installed runtime's Python packages up to the pinned list.
+
+    Models stay untouched; only PyPI packages are installed (small compared with the
+    approved download). The manifest is rewritten once pip succeeded.
+    """
+    manifest = installed(home)
+    if manifest is None:
+        raise SetupError("Qwen is not installed")
+    if manifest.get("packages") == list(PACKAGES):
+        return manifest
+    progress("Python-Pakete der Qwen-Umgebung werden aktualisiert …")
+    folder = qwen_home(home)
+    _pip_install(Path(str(manifest["python"])), PACKAGES, folder / "pip-update.log")
+    manifest["packages"] = list(PACKAGES)
+    write_json(folder / "installed.json", manifest)
+    return manifest
 
 
 def _install_python(python: PortablePython, home: Path, progress: Callable[[str], None]) -> Path:

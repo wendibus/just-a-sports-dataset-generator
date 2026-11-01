@@ -154,16 +154,27 @@ def arena(hall):
     key = material("Painted key", tuple(hall["key_color"]), 0.38)
     concrete = material("Wall", tuple(hall["wall_color"]), 0.8)
     steel = material("Powder coated steel", (0.08, 0.10, 0.13), 0.5, 0.35)
-    oak = wood_material(tuple(hall["floor_color"]), hall["floor_gloss"])
-    box("Wood court", (0, 0, -0.11), (34, 22, 0.2), oak)
-    # Fine plank seams, all coplanar and outside the annotation classes.
-    seam = material("Fine wood joints", tuple(c * 0.35 for c in hall["floor_color"]), 0.8)
-    for row in range(55):
-        y = -10.8 + row * 0.4
-        line("Maple board joint", [(-17, y, -0.008), (17, y, -0.008)], seam, 0.003)
-        for col in range(9):
-            x = -16 + col * 4 + (row % 3) * 1.2
-            line("Staggered board end", [(x, y, -0.007), (x, y + 0.4, -0.007)], seam, 0.002)
+    wood = hall.get("floor_kind", "wood") == "wood"
+    if wood:
+        floor = wood_material(tuple(hall["floor_color"]), hall["floor_gloss"])
+    else:  # poured polyurethane sports floor: even colour, slight sheen, no boards
+        floor = material("Synthetic sports floor", tuple(hall["floor_color"]), 0.55)
+        floor.node_tree.nodes.get("Principled BSDF").inputs["Coat Weight"].default_value = hall[
+            "floor_gloss"
+        ]
+    box("Court floor", (0, 0, -0.11), (44, 30, 0.2), floor)
+    if wood:  # fine plank seams, all coplanar and outside the annotation classes
+        seam = material("Fine wood joints", tuple(c * 0.35 for c in hall["floor_color"]), 0.8)
+        for row in range(55):
+            y = -10.8 + row * 0.4
+            line("Maple board joint", [(-17, y, -0.008), (17, y, -0.008)], seam, 0.003)
+            for col in range(9):
+                x = -16 + col * 4 + (row % 3) * 1.2
+                line("Staggered board end", [(x, y, -0.007), (x, y + 0.4, -0.007)], seam, 0.002)
+    for extra in hall.get("extra_lines", []):
+        other_sport_lines(
+            extra["sport"], material(f"{extra['sport']} lines", tuple(extra["color"]), 0.4)
+        )
     for sign in (-1, 1):
         box("Painted key", (sign * 11.1, 0, 0.001), (5.8, 4.9, 0.004), key)
         line(
@@ -206,7 +217,8 @@ def arena(hall):
     for sign in (-1, 1):
         box("End wall", (sign * 21, 0, 5.5), (0.3, 30, 11), concrete)
     seats = [material("Seat", tuple(color), 0.55) for color in hall["seat_colors"]]
-    for row in range(SEAT_ROWS):
+    arena_style = hall.get("style", "arena") == "arena"
+    for row in range(SEAT_ROWS if arena_style else 0):
         _x, y, z = seat_position(row, 0)
         box("Stand tier", (0, y, z * 0.5), (34, 0.86, z), concrete)
         for col in range(SEAT_COLUMNS):
@@ -244,8 +256,95 @@ def arena(hall):
             obj = bpy.data.objects.new("Arena softbox", data)
             bpy.context.collection.objects.link(obj)
             obj.location = (x, y, 9)
+    if hall.get("windows"):
+        windows(hall)
+    if hall.get("wall_bars"):
+        wall_bars()
     spectators(hall)
     return white, steel
+
+
+def other_sport_lines(sport, mat, z=0.009):
+    """Court lines of other sports in a multi-sport hall. They are floor markings only."""
+    width = 0.02
+    if sport == "handball":  # 40 x 20 m, 6 m goal areas and dashed 9 m lines
+        line(
+            "Handball boundary",
+            [(-20, -10, z), (20, -10, z), (20, 10, z), (-20, 10, z)],
+            mat,
+            width,
+            closed=True,
+        )
+        line("Handball centre", [(0, -10, z), (0, 10, z)], mat, width)
+        for sign in (-1, 1):
+            for radius, dashed in ((6.0, False), (9.0, True)):
+                points = []
+                for k in range(49):
+                    a = -math.pi / 2 + k * math.pi / 48
+                    post = 1.5 if math.sin(a) >= 0 else -1.5
+                    points.append(
+                        (sign * (20 - radius * math.cos(a)), post + radius * math.sin(a), z)
+                    )
+                if dashed:
+                    for k in range(0, 48, 2):
+                        line("Handball 9 m", points[k : k + 2], mat, width)
+                else:
+                    line("Handball 6 m", points, mat, width)
+    elif sport == "volleyball":  # 18 x 9 m with attack lines
+        line(
+            "Volleyball boundary",
+            [(-9, -4.5, z), (9, -4.5, z), (9, 4.5, z), (-9, 4.5, z)],
+            mat,
+            width,
+            closed=True,
+        )
+        for x in (-3, 0, 3):
+            line("Volleyball line", [(x, -4.5, z), (x, 4.5, z)], mat, width)
+    elif sport == "badminton":  # three 6.1 x 13.4 m courts across the hall
+        for cx in (-8, 0, 8):
+            line(
+                "Badminton boundary",
+                [
+                    (cx - 3.05, -6.7, z),
+                    (cx + 3.05, -6.7, z),
+                    (cx + 3.05, 6.7, z),
+                    (cx - 3.05, 6.7, z),
+                ],
+                mat,
+                width,
+                closed=True,
+            )
+            for y in (-1.98, 0, 1.98):
+                line("Badminton line", [(cx - 3.05, y, z), (cx + 3.05, y, z)], mat, width)
+
+
+def windows(hall):
+    """A band of daylight windows high on the far wall, and the sun shining through."""
+    glass = material("Window", (0.75, 0.82, 0.9), 0.1)
+    shader = glass.node_tree.nodes.get("Principled BSDF")
+    shader.inputs["Emission Color"].default_value = (0.8, 0.88, 1.0, 1)
+    shader.inputs["Emission Strength"].default_value = 3.0
+    frame = material("Window frame", (0.85, 0.86, 0.85), 0.5)
+    for x in range(-18, 19, 3):
+        box("Window", (x, 14.82, 8.4), (2.6, 0.05, 1.8), glass)
+        box("Window mullion", (x + 1.5, 14.8, 8.4), (0.12, 0.08, 1.9), frame)
+    sun = bpy.data.lights.new("Daylight", "SUN")
+    sun.energy = 2.5
+    sun.angle = 0.02
+    obj = bpy.data.objects.new("Daylight", sun)
+    bpy.context.collection.objects.link(obj)
+    obj.rotation_euler = (hall["sun_angle"], 0, math.pi)  # from the window side, downwards
+
+
+def wall_bars():
+    """Wooden wall bars along the far wall, common in school sports halls."""
+    wood = material("Wall bar wood", (0.6, 0.42, 0.22), 0.5)
+    left, right, y = -12.0, 12.0, 14.75
+    for x in [left + k for k in range(int(right - left) + 1)]:
+        limb("Wall bar post", (x, y, 0.0), (x, y, 2.6), 0.035, 0.035, wood)
+    for k in range(16):
+        z = 0.15 + k * 0.155
+        line("Wall bar rung", [(left, y - 0.02, z), (right, y - 0.02, z)], wood, 0.02)
 
 
 def shared_mesh(kind):
@@ -410,13 +509,45 @@ def along(a, b, t):
     return tuple(a[k] + (b[k] - a[k]) * t for k in range(3))
 
 
+# instance ID -> (upper-body pivot, first-frame crouch, per-frame updaters)
+RIGS = {}
+
+
+def set_limb(obj, a, b):
+    """Place a limb made by limb() between two points; bone lengths never change."""
+    a, b = Vector(a), Vector(b)
+    obj.location = (a + b) * 0.5
+    obj.rotation_euler = (b - a).to_track_quat("Z", "Y").to_euler()
+
+
 def athlete(plan):
-    """Build one athlete from the planned skeleton; the root follows the planned frames."""
-    identity, team, joints = plan["instance_id"], plan["team"], plan["joints"]
-    j = {name: tuple(value) for name, value in joints.items()}
+    """Build one athlete from the planned skeleton and register how it follows each frame.
+
+    Legs, arms, joints and shoes are placed from the frame's joints; head, torso, jersey
+    and lettering hang from an upper-body pivot that sinks with the frame's crouch.
+    """
+    identity, team = plan["instance_id"], plan["team"]
+    j = {name: tuple(value) for name, value in plan["joints"].items()}
     drop = plan["pose"]["crouch"]
     root = bpy.data.objects.new("Referee" if team == 2 else f"Player {plan['number']}", None)
     bpy.context.collection.objects.link(root)
+    upper = bpy.data.objects.new("Upper body", None)
+    bpy.context.collection.objects.link(upper)
+    upper.parent = root
+    updaters = []
+
+    def at_joint(obj, name, offset=(0.0, 0.0, 0.0)):
+        updaters.append(
+            lambda joints, obj=obj, name=name, offset=offset: setattr(
+                obj, "location", tuple(Vector(joints[name]) + Vector(offset))
+            )
+        )
+        return obj
+
+    def between(obj, start, end):
+        updaters.append(lambda joints, obj=obj: set_limb(obj, start(joints), end(joints)))
+        return obj
+
     skin = material("Skin", tuple(plan["skin"]), 0.53)
     skin.node_tree.nodes.get("Principled BSDF").inputs["Subsurface Weight"].default_value = 0.08
     kit = material("Basketball fabric", tuple(plan["kit"]), 0.82)
@@ -425,46 +556,55 @@ def athlete(plan):
     white = material("Socks and lettering", (light, light, light * 0.93), 0.8)
     socks = material("Socks", (0.88, 0.88, 0.82), 0.8)
     shorts = kit if team < 2 else dark
-    jersey_mesh(kit, identity, root, drop)
+    jersey_mesh(kit, identity, upper, drop)
     neck = j["neck"]
-    oval("Neck", (neck[0], neck[1], neck[2] + 0.04), (0.075, 0.075, 0.11), skin, identity, root)
+    oval("Neck", (neck[0], neck[1], neck[2] + 0.04), (0.075, 0.075, 0.11), skin, identity, upper)
     head = j["head"]
-    oval("Head", head, (0.103, 0.098, 0.143), skin, identity, root)
+    oval("Head", head, (0.103, 0.098, 0.143), skin, identity, upper)
     if plan["hair"] == "short":
-        oval(
-            "Short hair",
-            (head[0], head[1] + 0.013, head[2] + 0.075),
-            (0.105, 0.094, 0.076),
-            dark,
-            identity,
-            root,
-        )
+        hair = ((head[0], head[1] + 0.013, head[2] + 0.075), (0.105, 0.094, 0.076))
+        oval("Short hair", *hair, dark, identity, upper)
     elif plan["hair"] == "long":
-        oval(
-            "Long hair",
-            (head[0], head[1] + 0.03, head[2] + 0.02),
-            (0.115, 0.11, 0.15),
-            dark,
-            identity,
-            root,
-        )
-    oval("Nose", j["nose"], (0.020, 0.028, 0.033), skin, identity, root)
+        hair = ((head[0], head[1] + 0.03, head[2] + 0.02), (0.115, 0.11, 0.15))
+        oval("Long hair", *hair, dark, identity, upper)
+    oval("Nose", j["nose"], (0.020, 0.028, 0.033), skin, identity, upper)
     for prefix in ("right", "left"):
-        oval("Ear", j[f"{prefix}_ear"], (0.018, 0.025, 0.040), skin, identity, root)
+        oval("Ear", j[f"{prefix}_ear"], (0.018, 0.025, 0.040), skin, identity, upper)
         eye = j[f"{prefix}_eye"]
-        oval("Eye", eye, (0.016, 0.008, 0.009), socks, identity, root)
-        oval("Iris", (eye[0], eye[1] - 0.008, eye[2]), (0.007, 0.003, 0.007), dark, identity, root)
-        hip, knee, ankle = j[f"{prefix}_hip"], j[f"{prefix}_knee"], j[f"{prefix}_ankle"]
-        thigh_split = along(hip, knee, 0.45)
-        limb("Shorts leg", hip, thigh_split, 0.14, 0.13, shorts, identity, root)
-        limb("Thigh", thigh_split, knee, 0.105, 0.080, skin, identity, root)
-        oval("Knee", knee, (0.078, 0.078, 0.082), skin, identity, root)
-        limb("Calf", knee, ankle, 0.075, 0.045, skin, identity, root)
-        limb("Sock", along(ankle, knee, 0.4), ankle, 0.050, 0.047, socks, identity, root)
-        oval(
+        oval("Eye", eye, (0.016, 0.008, 0.009), socks, identity, upper)
+        oval("Iris", (eye[0], eye[1] - 0.008, eye[2]), (0.007, 0.003, 0.007), dark, identity, upper)
+        hip_n, knee_n, ankle_n = f"{prefix}_hip", f"{prefix}_knee", f"{prefix}_ankle"
+        hip, knee, ankle = j[hip_n], j[knee_n], j[ankle_n]
+
+        def split(joints, hip_n=hip_n, knee_n=knee_n):
+            return along(joints[hip_n], joints[knee_n], 0.45)
+
+        def sock_top(joints, ankle_n=ankle_n, knee_n=knee_n):
+            return along(joints[ankle_n], joints[knee_n], 0.4)
+
+        def get(name):
+            return lambda joints: joints[name]
+
+        between(
+            limb("Shorts leg", hip, split(j), 0.14, 0.13, shorts, identity, root), get(hip_n), split
+        )
+        between(
+            limb("Thigh", split(j), knee, 0.105, 0.080, skin, identity, root), split, get(knee_n)
+        )
+        at_joint(oval("Knee", knee, (0.078, 0.078, 0.082), skin, identity, root), knee_n)
+        between(
+            limb("Calf", knee, ankle, 0.075, 0.045, skin, identity, root), get(knee_n), get(ankle_n)
+        )
+        between(
+            limb("Sock", sock_top(j), ankle, 0.050, 0.047, socks, identity, root),
+            sock_top,
+            get(ankle_n),
+        )
+        shoe = oval(
             "Shoe", (ankle[0], ankle[1] - 0.060, 0.065), (0.067, 0.145, 0.065), dark, identity, root
         )
-        box(
+        at_joint(shoe, ankle_n, (0.0, -0.060, 0.065 - ankle[2]))
+        sole = box(
             "Shoe sole",
             (ankle[0], ankle[1] - 0.06, 0.026),
             (0.13, 0.26, 0.033),
@@ -473,22 +613,34 @@ def athlete(plan):
             root,
             0.014,
         )
-        shoulder, elbow, wrist = j[f"{prefix}_shoulder"], j[f"{prefix}_elbow"], j[f"{prefix}_wrist"]
-        oval("Shoulder", shoulder, (0.098, 0.098, 0.11), skin, identity, root)
-        limb("Upper arm", shoulder, elbow, 0.083, 0.061, skin, identity, root)
-        oval("Elbow", elbow, (0.061, 0.061, 0.061), skin, identity, root)
-        limb("Forearm", elbow, wrist, 0.061, 0.035, skin, identity, root)
-        direction = Vector(wrist) - Vector(elbow)
-        direction.normalize()
-        palm = Vector(wrist) + direction * 0.05
-        hand = limb(
-            "Hand", wrist, tuple(palm + direction * 0.04), 0.045, 0.04, skin, identity, root
+        at_joint(sole, ankle_n, (0.0, -0.06, 0.026 - ankle[2]))
+        shoulder_n, elbow_n, wrist_n = f"{prefix}_shoulder", f"{prefix}_elbow", f"{prefix}_wrist"
+        shoulder, elbow, wrist = j[shoulder_n], j[elbow_n], j[wrist_n]
+        at_joint(oval("Shoulder", shoulder, (0.098, 0.098, 0.11), skin, identity, root), shoulder_n)
+        between(
+            limb("Upper arm", shoulder, elbow, 0.083, 0.061, skin, identity, root),
+            get(shoulder_n),
+            get(elbow_n),
         )
+        at_joint(oval("Elbow", elbow, (0.061, 0.061, 0.061), skin, identity, root), elbow_n)
+        between(
+            limb("Forearm", elbow, wrist, 0.061, 0.035, skin, identity, root),
+            get(elbow_n),
+            get(wrist_n),
+        )
+
+        def fingertips(joints, elbow_n=elbow_n, wrist_n=wrist_n):
+            direction = Vector(joints[wrist_n]) - Vector(joints[elbow_n])
+            direction.normalize()
+            return tuple(Vector(joints[wrist_n]) + direction * 0.09)
+
+        hand = limb("Hand", wrist, fingertips(j), 0.045, 0.04, skin, identity, root)
         hand.scale = (1, 0.6, 1)
+        between(hand, get(wrist_n), fingertips)
     torso_z = 1.20 - drop
     if team < 2:
         text_object(
-            str(plan["number"]), (0, -0.153, torso_z), 0.19, white, identity=identity, parent=root
+            str(plan["number"]), (0, -0.153, torso_z), 0.19, white, identity=identity, parent=upper
         )
         text_object(
             str(plan["number"]),
@@ -497,35 +649,80 @@ def athlete(plan):
             white,
             rotation=(math.pi / 2, 0, math.pi),
             identity=identity,
-            parent=root,
+            parent=upper,
         )
         for side in (-1, 1):
-            line(
-                "Uniform trim",
-                [(side * 0.203, 0, 0.96 - drop), (side * 0.25, 0, 1.44 - drop)],
-                white,
-                0.012,
-                identity,
-                root,
-            )
+            trim = [(side * 0.203, 0, 0.96 - drop), (side * 0.25, 0, 1.44 - drop)]
+            line("Uniform trim", trim, white, 0.012, identity, upper)
     else:
         for x in (-0.15, -0.075, 0, 0.075, 0.15):
-            line(
-                "Referee stripe",
-                [(x, -0.139, 1.02 - drop), (x, -0.151, 1.45 - drop)],
-                dark,
-                0.014,
-                identity,
-                root,
-            )
+            stripe = [(x, -0.139, 1.02 - drop), (x, -0.151, 1.45 - drop)]
+            line("Referee stripe", stripe, dark, 0.014, identity, upper)
+    RIGS[identity] = (upper, drop, updaters)
     SKELETONS[identity] = (root, {name: j[name] for name in OPENPOSE_18})
     return root
 
 
-def place_athlete(root, frame):
+def pose_athlete(plan, root, frame):
+    """Move an athlete to a frame: root transform, crouch and every limb from the joints."""
     root.location = tuple(frame["position"])
     root.rotation_euler = (0, 0, frame["heading"])
     root.scale = (1, 1, frame["height_scale"])
+    upper, first_crouch, updaters = RIGS[plan["instance_id"]]
+    joints = {name: tuple(value) for name, value in frame.get("joints", plan["joints"]).items()}
+    upper.location = (0, 0, first_crouch - frame.get("crouch", first_crouch))
+    for update in updaters:
+        update(joints)
+    SKELETONS[plan["instance_id"]] = (root, {name: joints[name] for name in OPENPOSE_18})
+
+
+def bench_people(people):
+    """Substitutes on benches and standing coaches: background people, never labelled."""
+    if not people:
+        return
+    seat = material("Team bench", (0.05, 0.06, 0.08), 0.6)
+    for person in people:
+        x, y = person["position"]
+        cloth = material("Bench clothing", tuple(person["kit"]), 0.8)
+        skin = material("Bench skin", tuple(person["skin"]), 0.55)
+        lean = person["lean"]
+        if person["kind"] == "substitute":
+            hip_z = 0.5
+            box("Bench seat", (x, y + 0.05, 0.43), (0.56, 0.45, 0.06), seat)
+            box("Bench back", (x, y + 0.3, 0.7), (0.56, 0.05, 0.5), seat)
+            for side in (-1, 1):
+                knee = (x + side * 0.11, y - 0.42, 0.5)
+                limb("Bench thigh", (x + side * 0.11, y, hip_z), knee, 0.09, 0.075, cloth)
+                limb("Bench shin", knee, (x + side * 0.12, y - 0.48, 0.1), 0.065, 0.045, skin)
+                oval("Bench shoe", (x + side * 0.12, y - 0.55, 0.06), (0.06, 0.13, 0.06), seat)
+        else:
+            hip_z = 0.95
+            for side in (-1, 1):
+                limb(
+                    "Coach leg",
+                    (x + side * 0.1, y, hip_z),
+                    (x + side * 0.12, y, 0.08),
+                    0.09,
+                    0.06,
+                    cloth,
+                )
+                oval("Coach shoe", (x + side * 0.12, y - 0.06, 0.06), (0.06, 0.13, 0.06), seat)
+        forward = Vector((0, -math.sin(lean), math.cos(lean)))
+        hip = Vector((x, y, hip_z))
+        torso = box("Bench torso", tuple(hip + forward * 0.32), (0.4, 0.24, 0.6), cloth)
+        torso.rotation_euler = (-lean, 0, 0)
+        oval("Bench head", tuple(hip + forward * 0.75), (0.1, 0.1, 0.13), skin)
+        for side in (-1, 1):
+            shoulder = hip + forward * 0.56 + Vector((side * 0.24, 0, 0))
+            hand = shoulder + Vector((side * 0.05, -0.18, -0.42))
+            limb(
+                "Bench arm",
+                tuple(shoulder),
+                tuple(hand),
+                0.06,
+                0.045,
+                cloth if person["kind"] == "coach" else skin,
+            )
 
 
 def ball():
@@ -760,6 +957,7 @@ def main():
     hoop(-1, 40, white, steel)
     hoop(1, 41, white, steel)
     athletes = [(plan, athlete(plan)) for plan in layout["athletes"]]
+    bench_people(layout.get("benches", []))
     ball_root = ball()
     preset = job.get("camera", "broadcast")
     camera_data = bpy.data.cameras.new("Dataset camera")
@@ -792,7 +990,7 @@ def main():
         scene.frame_set(frame + 1)
         place_camera(frame)
         for plan, root in athletes:
-            place_athlete(root, plan["frames"][frame])
+            pose_athlete(plan, root, plan["frames"][frame])
         ball_root.location = tuple(layout["ball"]["positions"][frame])
         bpy.context.view_layer.update()
         stem = f"frame-{frame:06d}"
@@ -842,7 +1040,7 @@ def main():
                 "ball_event": layout["ball"]["event"],
                 "limitations": [
                     "Procedural athletes; realism and training benefit not validated",
-                    "One pose per athlete and scene; athletes glide between frames",
+                    "Procedural motion model; no motion capture",
                     "Opaque practice backboards",
                 ],
             },
