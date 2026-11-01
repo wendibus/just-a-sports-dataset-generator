@@ -736,21 +736,56 @@ def _benches(rng: random.Random, kits: list[tuple[float, float, float]]) -> list
     return people
 
 
+HALL_STYLES = ("arena", "school_gym")
+"""arena: stands with spectators. school_gym: a multi-sport hall without stands, typical for
+amateur leagues: other sports' court lines, often a synthetic floor, windows, wall bars."""
+LINE_COLORS = (
+    (0.9, 0.91, 0.86),
+    (0.95, 0.85, 0.2),
+    (0.05, 0.05, 0.05),
+    (0.1, 0.35, 0.8),
+    (0.8, 0.12, 0.1),
+    (0.1, 0.55, 0.25),
+)
+
+
 def _hall(rng: random.Random) -> dict[str, object]:
     u = rng.uniform
+    style = rng.choices(HALL_STYLES, (0.45, 0.55))[0]
     wood = rng.choice(((0.65, 0.39, 0.16), (0.72, 0.5, 0.26), (0.55, 0.3, 0.12), (0.78, 0.6, 0.38)))
+    synthetic = style == "school_gym" and rng.random() < 0.5
+    floor = (
+        rng.choice(((0.12, 0.35, 0.2), (0.15, 0.3, 0.55), (0.45, 0.45, 0.47), (0.55, 0.2, 0.15)))
+        if synthetic
+        else wood
+    )
     key = rng.choice(
-        ((0.018, 0.055, 0.10), (0.45, 0.04, 0.03), (0.02, 0.2, 0.08), (0.3, 0.3, 0.32), wood)
+        ((0.018, 0.055, 0.10), (0.45, 0.04, 0.03), (0.02, 0.2, 0.08), (0.3, 0.3, 0.32), floor)
     )
     wall = rng.choice(
         ((0.28, 0.30, 0.32), (0.55, 0.55, 0.52), (0.12, 0.18, 0.3), (0.62, 0.6, 0.55))
     )
+    basketball_line = rng.choice(LINE_COLORS[:3])
+    others = [color for color in LINE_COLORS if color != basketball_line]
+    extra_lines: list[dict[str, object]] = []
+    if style == "school_gym":
+        for sport in ("handball", "volleyball", "badminton"):
+            if rng.random() < {"handball": 0.8, "volleyball": 0.6, "badminton": 0.4}[sport]:
+                extra_lines.append({"sport": sport, "color": list(rng.choice(others))})
+    elif rng.random() < 0.2:
+        extra_lines.append({"sport": "volleyball", "color": list(rng.choice(others))})
     return {
-        "floor_color": [round(c * u(0.9, 1.1), 4) for c in wood],
-        "floor_gloss": round(u(0.2, 0.45), 3),
+        "style": style,
+        "floor_kind": "synthetic" if synthetic else "wood",
+        "floor_color": [round(c * u(0.9, 1.1), 4) for c in floor],
+        "floor_gloss": round(u(0.05, 0.2) if synthetic else u(0.2, 0.45), 3),
         "key_color": list(key),
-        "line_color": list(rng.choice(((0.9, 0.91, 0.86), (0.95, 0.85, 0.2), (0.05, 0.05, 0.05)))),
+        "line_color": list(basketball_line),
+        "extra_lines": extra_lines,
         "wall_color": list(wall),
+        "windows": style == "school_gym" and rng.random() < 0.7,
+        "sun_angle": round(u(0.3, 1.1), 3),
+        "wall_bars": style == "school_gym" and rng.random() < 0.6,
         "seat_colors": [
             list(rng.choice(((0.035, 0.12, 0.22), (0.5, 0.06, 0.05), (0.08, 0.3, 0.12)))),
             [0.46, 0.49, 0.51],
@@ -758,6 +793,8 @@ def _hall(rng: random.Random) -> dict[str, object]:
         "light_energy": round(u(1100, 2600), 1),
         "light_kelvin": round(u(3800, 6500), 0),
         "light_rows": rng.choice((2, 3)),
-        "spectator_density": round(rng.choice((0.0, u(0.05, 0.3), u(0.3, 0.8))), 3),
+        "spectator_density": (
+            round(rng.choice((0.0, u(0.05, 0.3), u(0.3, 0.8))), 3) if style == "arena" else 0.0
+        ),
         "spectator_seed": rng.randrange(2**31),
     }

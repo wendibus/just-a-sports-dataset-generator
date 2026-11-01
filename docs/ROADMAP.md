@@ -39,6 +39,9 @@ Reco's importer does not preserve dataset splits and currently imports detection
 - Scene variety from a renderer-independent planner: four game situations over the whole
   court, nine parametric pose families, six ball events, hall/light variation, spectators
   as background, motion between frames ([BASKETBALL.md](BASKETBALL.md#scene-variety)).
+- Animated athletes: per-frame joints with gait cycles, dribble, shot and pass motions and
+  ballistic jumps; team benches as hard negatives; multi-sport school gyms with other
+  sports' lines, synthetic floors, windows and wall bars.
 - Resumable render runs; the Mac starter can cancel and later resume a run.
 - The Qwen runtime brings a pinned portable Python, so no system Python is needed.
 - Status documentation aligned with the code; the 8-bit instance pass is a documented
@@ -49,8 +52,9 @@ Still open, in order of value:
 1. Verify the Qwen repaint and the panorama geometry on real hardware and real Reco frames.
 2. Measure training value: RF-DETR trained on real labels only versus real plus synthetic,
    evaluated on a held-out set of real games.
-3. Animated athletes (pose changes between frames), benches and substitutes, more hall
-   geometry (windows, different stands), and a rigged body model for richer poses.
+3. A rigged body model with clothing for richer poses and silhouettes (requires choosing a
+   freely licensed body asset), torso bending and twisting, goal-mounted or ceiling-hung
+   baskets, and hall shapes beyond one rectangular room.
 
 Before releasing each sport milestone, compare the taxonomy with the upstream Reco Trainer source and record the checked revision. Any upstream change requires an explicit compatibility update.
 

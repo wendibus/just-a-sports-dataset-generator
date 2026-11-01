@@ -214,6 +214,25 @@ class LayoutTests(unittest.TestCase):
                         self.assertGreater(math.hypot(ax - x, ay - y), 0.4)
         self.assertGreater(found, 50)
 
+    def test_halls_include_arenas_and_multi_sport_school_gyms(self):
+        halls = [plan_scene(seed, 1)["hall"] for seed in range(200)]
+        styles = {hall["style"] for hall in halls}  # type: ignore[index]
+        self.assertEqual(styles, {"arena", "school_gym"})
+        sports = set()
+        for hall in halls:
+            lines = hall["extra_lines"]  # type: ignore[index]
+            sports |= {line["sport"] for line in lines}
+            if hall["style"] == "school_gym":  # type: ignore[index]
+                self.assertEqual(hall["spectator_density"], 0.0)  # type: ignore[index]
+            else:
+                self.assertFalse(hall["windows"] or hall["wall_bars"])  # type: ignore[index]
+                self.assertEqual(hall["floor_kind"], "wood")  # type: ignore[index]
+                self.assertTrue(all(line["sport"] == "volleyball" for line in lines))
+            for line in lines:  # other sports never reuse the basketball line colour
+                self.assertNotEqual(line["color"], hall["line_color"])  # type: ignore[index]
+        self.assertEqual(sports, {"handball", "volleyball", "badminton"})
+        self.assertIn("synthetic", {hall["floor_kind"] for hall in halls})  # type: ignore[index]
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,6 +50,13 @@ the plan's version, situation, ball event and checksum as an asset.
   a team-mate, shot along an arc to the rim and dropping through, at the rim, loose on
   the floor, or tossed at a jump ball. A pass or shot may already be under way at the
   first frame. The ball is labelled in every state; occluded frames simply have no box.
+- **Hall type**: an arena with stands (45 %) or a multi-sport school gym (55 %), the
+  typical hall of amateur leagues and therefore of many Reco recordings. School gyms
+  have no stands, half of them a synthetic floor (green, blue, grey or red) instead of
+  wood, court lines of other sports in other colours (handball 40 × 20 m with dashed 9 m
+  lines, volleyball, three crosswise badminton courts), often a band of daylight windows
+  with sun, and wooden wall bars. Arenas occasionally carry volleyball lines too. Other
+  sports' lines never share the basketball line colour.
 - **Hall and light**: wood tone and gloss, key, line, wall and seat colours, light
   energy, colour temperature (3800–6500 K) and number of light rows, scoreboard text.
 - **Spectators**: none, sparse or dense seated figures on the stands. They render as

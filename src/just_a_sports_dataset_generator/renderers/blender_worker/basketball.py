@@ -154,16 +154,27 @@ def arena(hall):
     key = material("Painted key", tuple(hall["key_color"]), 0.38)
     concrete = material("Wall", tuple(hall["wall_color"]), 0.8)
     steel = material("Powder coated steel", (0.08, 0.10, 0.13), 0.5, 0.35)
-    oak = wood_material(tuple(hall["floor_color"]), hall["floor_gloss"])
-    box("Wood court", (0, 0, -0.11), (34, 22, 0.2), oak)
-    # Fine plank seams, all coplanar and outside the annotation classes.
-    seam = material("Fine wood joints", tuple(c * 0.35 for c in hall["floor_color"]), 0.8)
-    for row in range(55):
-        y = -10.8 + row * 0.4
-        line("Maple board joint", [(-17, y, -0.008), (17, y, -0.008)], seam, 0.003)
-        for col in range(9):
-            x = -16 + col * 4 + (row % 3) * 1.2
-            line("Staggered board end", [(x, y, -0.007), (x, y + 0.4, -0.007)], seam, 0.002)
+    wood = hall.get("floor_kind", "wood") == "wood"
+    if wood:
+        floor = wood_material(tuple(hall["floor_color"]), hall["floor_gloss"])
+    else:  # poured polyurethane sports floor: even colour, slight sheen, no boards
+        floor = material("Synthetic sports floor", tuple(hall["floor_color"]), 0.55)
+        floor.node_tree.nodes.get("Principled BSDF").inputs["Coat Weight"].default_value = hall[
+            "floor_gloss"
+        ]
+    box("Court floor", (0, 0, -0.11), (44, 30, 0.2), floor)
+    if wood:  # fine plank seams, all coplanar and outside the annotation classes
+        seam = material("Fine wood joints", tuple(c * 0.35 for c in hall["floor_color"]), 0.8)
+        for row in range(55):
+            y = -10.8 + row * 0.4
+            line("Maple board joint", [(-17, y, -0.008), (17, y, -0.008)], seam, 0.003)
+            for col in range(9):
+                x = -16 + col * 4 + (row % 3) * 1.2
+                line("Staggered board end", [(x, y, -0.007), (x, y + 0.4, -0.007)], seam, 0.002)
+    for extra in hall.get("extra_lines", []):
+        other_sport_lines(
+            extra["sport"], material(f"{extra['sport']} lines", tuple(extra["color"]), 0.4)
+        )
     for sign in (-1, 1):
         box("Painted key", (sign * 11.1, 0, 0.001), (5.8, 4.9, 0.004), key)
         line(
@@ -206,7 +217,8 @@ def arena(hall):
     for sign in (-1, 1):
         box("End wall", (sign * 21, 0, 5.5), (0.3, 30, 11), concrete)
     seats = [material("Seat", tuple(color), 0.55) for color in hall["seat_colors"]]
-    for row in range(SEAT_ROWS):
+    arena_style = hall.get("style", "arena") == "arena"
+    for row in range(SEAT_ROWS if arena_style else 0):
         _x, y, z = seat_position(row, 0)
         box("Stand tier", (0, y, z * 0.5), (34, 0.86, z), concrete)
         for col in range(SEAT_COLUMNS):
@@ -244,8 +256,95 @@ def arena(hall):
             obj = bpy.data.objects.new("Arena softbox", data)
             bpy.context.collection.objects.link(obj)
             obj.location = (x, y, 9)
+    if hall.get("windows"):
+        windows(hall)
+    if hall.get("wall_bars"):
+        wall_bars()
     spectators(hall)
     return white, steel
+
+
+def other_sport_lines(sport, mat, z=0.009):
+    """Court lines of other sports in a multi-sport hall. They are floor markings only."""
+    width = 0.02
+    if sport == "handball":  # 40 x 20 m, 6 m goal areas and dashed 9 m lines
+        line(
+            "Handball boundary",
+            [(-20, -10, z), (20, -10, z), (20, 10, z), (-20, 10, z)],
+            mat,
+            width,
+            closed=True,
+        )
+        line("Handball centre", [(0, -10, z), (0, 10, z)], mat, width)
+        for sign in (-1, 1):
+            for radius, dashed in ((6.0, False), (9.0, True)):
+                points = []
+                for k in range(49):
+                    a = -math.pi / 2 + k * math.pi / 48
+                    post = 1.5 if math.sin(a) >= 0 else -1.5
+                    points.append(
+                        (sign * (20 - radius * math.cos(a)), post + radius * math.sin(a), z)
+                    )
+                if dashed:
+                    for k in range(0, 48, 2):
+                        line("Handball 9 m", points[k : k + 2], mat, width)
+                else:
+                    line("Handball 6 m", points, mat, width)
+    elif sport == "volleyball":  # 18 x 9 m with attack lines
+        line(
+            "Volleyball boundary",
+            [(-9, -4.5, z), (9, -4.5, z), (9, 4.5, z), (-9, 4.5, z)],
+            mat,
+            width,
+            closed=True,
+        )
+        for x in (-3, 0, 3):
+            line("Volleyball line", [(x, -4.5, z), (x, 4.5, z)], mat, width)
+    elif sport == "badminton":  # three 6.1 x 13.4 m courts across the hall
+        for cx in (-8, 0, 8):
+            line(
+                "Badminton boundary",
+                [
+                    (cx - 3.05, -6.7, z),
+                    (cx + 3.05, -6.7, z),
+                    (cx + 3.05, 6.7, z),
+                    (cx - 3.05, 6.7, z),
+                ],
+                mat,
+                width,
+                closed=True,
+            )
+            for y in (-1.98, 0, 1.98):
+                line("Badminton line", [(cx - 3.05, y, z), (cx + 3.05, y, z)], mat, width)
+
+
+def windows(hall):
+    """A band of daylight windows high on the far wall, and the sun shining through."""
+    glass = material("Window", (0.75, 0.82, 0.9), 0.1)
+    shader = glass.node_tree.nodes.get("Principled BSDF")
+    shader.inputs["Emission Color"].default_value = (0.8, 0.88, 1.0, 1)
+    shader.inputs["Emission Strength"].default_value = 3.0
+    frame = material("Window frame", (0.85, 0.86, 0.85), 0.5)
+    for x in range(-18, 19, 3):
+        box("Window", (x, 14.82, 8.4), (2.6, 0.05, 1.8), glass)
+        box("Window mullion", (x + 1.5, 14.8, 8.4), (0.12, 0.08, 1.9), frame)
+    sun = bpy.data.lights.new("Daylight", "SUN")
+    sun.energy = 2.5
+    sun.angle = 0.02
+    obj = bpy.data.objects.new("Daylight", sun)
+    bpy.context.collection.objects.link(obj)
+    obj.rotation_euler = (hall["sun_angle"], 0, math.pi)  # from the window side, downwards
+
+
+def wall_bars():
+    """Wooden wall bars along the far wall, common in school sports halls."""
+    wood = material("Wall bar wood", (0.6, 0.42, 0.22), 0.5)
+    left, right, y = -12.0, 12.0, 14.75
+    for x in [left + k for k in range(int(right - left) + 1)]:
+        limb("Wall bar post", (x, y, 0.0), (x, y, 2.6), 0.035, 0.035, wood)
+    for k in range(16):
+        z = 0.15 + k * 0.155
+        line("Wall bar rung", [(left, y - 0.02, z), (right, y - 0.02, z)], wood, 0.02)
 
 
 def shared_mesh(kind):
