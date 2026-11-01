@@ -139,7 +139,7 @@ sports-dataset export outputs/demo --output outputs/dataset
 sports-dataset preview outputs/dataset --output outputs/Vorschau
 ```
 
-The reference renderer writes geometric RGB and instance-ID images. Export derives boxes and COCO masks from visible pixels, converts RGB to PNG, and writes native annotations, whole-scene splits, checksums, and provenance. Existing render/export folders are never overwritten; use a new output folder for each run. The renderer supports boxes and instance masks; other requested passes fail explicitly.
+The reference renderer writes geometric RGB and instance-ID images. Export derives boxes and COCO masks from visible pixels, converts RGB to PNG, and writes native annotations, whole-scene splits, checksums, and provenance. Existing render/export folders are never overwritten; use a new output folder for each run. Render runs build in `<output>.partial` and publish it as `<output>` when complete; if a run is interrupted, running the same command again resumes it and skips finished scenes (the result is byte-identical to an uninterrupted run). A leftover with different recipe or settings is refused rather than mixed in. The renderer supports boxes and instance masks; other requested passes fail explicitly.
 
 These rectangle images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. Use `render-basketball` for the 3D scenes. Open work is tracked in [docs/ROADMAP.md](docs/ROADMAP.md); the most important open question is whether the synthetic data improves RF-DETR on real footage.
 

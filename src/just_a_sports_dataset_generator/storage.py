@@ -38,3 +38,40 @@ def new_directory(destination: Path) -> Generator[Path, None, None]:
     finally:
         if staging.exists():
             shutil.rmtree(staging)
+
+
+@contextmanager
+def resumable_directory(
+    destination: Path, fingerprint: dict[str, object]
+) -> Generator[tuple[Path, bool], None, None]:
+    """Build in ``<destination>.partial`` and keep it when interrupted, so a rerun resumes.
+
+    Yields the work folder and whether an earlier run is being resumed. A leftover folder
+    is only reused when its fingerprint (command, inputs and settings) matches exactly;
+    on success it is published as ``destination``, which is never merged into.
+    """
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError(f"output already exists: {destination}")
+    partial = destination.with_name(destination.name + ".partial")
+    marker = partial / "resume.json"
+    resumed = partial.exists()
+    if resumed:
+        try:
+            previous = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous = None
+        if previous != fingerprint:
+            raise FileExistsError(
+                f"an unfinished run with other settings exists: {partial}; "
+                "delete it or choose another output folder"
+            )
+        for stale in partial.glob(".sports-staging-*"):  # interrupted mid-scene
+            shutil.rmtree(stale)
+    else:
+        partial.mkdir(parents=True)
+        write_json(marker, fingerprint)
+    yield partial, resumed
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError(f"output already exists: {destination}")
+    marker.unlink()
+    partial.rename(destination)

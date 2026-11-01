@@ -24,7 +24,11 @@ from just_a_sports_dataset_generator.renderers import ReferenceRenderer
 from just_a_sports_dataset_generator.renderers.blender import BlenderBasketballRenderer
 from just_a_sports_dataset_generator.renderers.contracts import RenderResult
 from just_a_sports_dataset_generator.scenario import load_recipe, plan_jobs
-from just_a_sports_dataset_generator.storage import new_directory, sha256_file, write_json
+from just_a_sports_dataset_generator.storage import (
+    resumable_directory,
+    sha256_file,
+    write_json,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -235,9 +239,30 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
         jobs = plan_jobs(recipe)
         if args.max_scenes is not None:
             jobs = jobs[: args.max_scenes]
-        with new_directory(args.output) as staging:
+        fingerprint: dict[str, object] = {
+            "command": args.command,
+            "recipe_sha256": sha256_file(args.recipe),
+            "renderer": renderer.metadata.plugin_id,
+            "renderer_version": renderer.metadata.version,
+            "assets": [dict(asset) for asset in getattr(renderer, "assets", [])],
+            "samples": getattr(args, "samples", None),
+            "device": getattr(args, "device", None),
+            "max_scenes": args.max_scenes,
+            "max_frames": args.max_frames,
+        }
+        with resumable_directory(args.output, fingerprint) as (staging, resumed):
+            if resumed:
+                message = "Abgebrochener Lauf wird fortgesetzt; fertige Szenen werden übernommen."
+                print(message, flush=True)
+                if progress:
+                    progress(message)
             results: list[RenderResult] = []
             for index, job in enumerate(jobs):
+                manifest = staging / job.job_id / "scene.json"
+                if manifest.is_file():  # finished before the interruption; published atomically
+                    frames = len(json.loads(manifest.read_text(encoding="utf-8"))["frames"])
+                    results.append(RenderResult(job.job_id, manifest.parent, frames, manifest))
+                    continue
                 message = f"Szene {index + 1} von {len(jobs)} wird berechnet …"
                 print(message, flush=True)
                 if progress:
