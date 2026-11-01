@@ -10,6 +10,7 @@ import subprocess
 import time
 from dataclasses import asdict
 from pathlib import Path
+from typing import cast
 
 from PIL import Image
 
@@ -25,6 +26,7 @@ from just_a_sports_dataset_generator.annotations.scene import (
 )
 from just_a_sports_dataset_generator.core import CAMERA_PRESETS, SceneJob, labels_for_sport
 from just_a_sports_dataset_generator.plugins import PLUGIN_API_VERSION, PluginMetadata
+from just_a_sports_dataset_generator.sports.basketball import LAYOUT_SCHEMA, plan_scene
 from just_a_sports_dataset_generator.storage import new_directory, sha256_file, write_json
 
 from .contracts import RenderResult
@@ -101,12 +103,16 @@ class BlenderBasketballRenderer:
             raise ValueError("max_frames must be positive")
         count = min(job.frame_count, max_frames) if max_frames is not None else job.frame_count
         destination = output_directory / job.job_id
+        layout = plan_scene(job.seed, count)
         with new_directory(destination) as staging:
+            # The renderer-independent plan is kept with the scene for inspection and replay.
+            write_json(staging / "layout.json", layout)
             request = staging / "request.json"
             write_json(
                 request,
                 {
                     "job": asdict(job),
+                    "layout": layout,
                     "frames": count,
                     "samples": self.samples,
                     "device": self.device,
@@ -246,6 +252,15 @@ class BlenderBasketballRenderer:
                     "assets": self.assets
                     + [
                         {
+                            "id": "basketball-layout",
+                            "version": LAYOUT_SCHEMA,
+                            "license": "Apache-2.0",
+                            "source": "sports/basketball.py",
+                            "situation": layout["situation"],
+                            "ball_event": cast(dict[str, object], layout["ball"])["event"],
+                            "sha256": sha256_file(staging / "layout.json"),
+                        },
+                        {
                             "id": "blender-cycles",
                             "version": payload.get("blender_version"),
                             "license": "GPL-3.0-or-later",
@@ -253,7 +268,7 @@ class BlenderBasketballRenderer:
                             "samples": self.samples,
                             "device": payload.get("device"),
                             "elapsed_seconds": round(time.monotonic() - started, 3),
-                        }
+                        },
                     ],
                     "frames": validated,
                 },

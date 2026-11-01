@@ -1,7 +1,9 @@
 # Local 3D basketball — version 0.4
 
 The backend generates a procedural indoor court, painted markings, two baskets,
-ten athletes in two kits, a referee, a basketball, seating, lights, and a camera.
+ten athletes in two kits, one or two referees, a basketball, stands with optional
+spectators, lights, and a camera. A renderer-independent planner varies the game
+situation, poses, ball, hall and motion per scene (see [scene variety](#scene-variety)).
 It needs locally installed Blender 5.x. No models, textures, motion libraries,
 accounts, or remote processing services are used. Geometry and materials are
 created by the bundled worker source. Football and futsal remain future stages.
@@ -27,6 +29,34 @@ the finished preview. It does not contact a web server or need internet access.
 Closing the progress page does not cancel rendering. Cancellation/resumption and
 a full scene editor are not implemented. `--reference-demo` retains the old
 rectangle test; `--demo` now generates the three 3D basketball images.
+
+## Scene variety
+
+Each scene is planned by `sports/basketball.py` (Apache-2.0, unit-tested without
+Blender) from the scene seed, and the plan is saved as `layout.json` next to
+`scene.json`; the Blender worker only builds geometry from it. `scene.json` records
+the plan's version, situation, ball event and checksum as an asset.
+
+- **Situations** (weights): half-court set play towards either basket (50 %),
+  transition over the whole court (25 %), free throw with players on the lane (15 %),
+  jump ball at the centre circle (10 %). Offense spots are sampled from typical
+  positions with jitter; defenders guard their player between player and basket;
+  athletes keep at least 0.6 m apart.
+- **Poses**: stand, run, defend, dribble, shoot, pass, catch, rebound (with jump) and a
+  referee signal, each with continuous parameters (crouch, stance width, stride, arm
+  elevation, direction and elbow bend). Legs use two-bone IK with constant bone lengths
+  and feet on the floor; knees always bend forward. The same joints feed `poses.json`.
+- **Ball**: held or dribbled (bouncing between hand and floor), passed along an arc to
+  a team-mate, shot along an arc to the rim and dropping through, at the rim, loose on
+  the floor, or tossed at a jump ball. A pass or shot may already be under way at the
+  first frame. The ball is labelled in every state; occluded frames simply have no box.
+- **Hall and light**: wood tone and gloss, key, line, wall and seat colours, light
+  energy, colour temperature (3800–6500 K) and number of light rows, scoreboard text.
+- **Spectators**: none, sparse or dense seated figures on the stands. They render as
+  background (ID 0): people outside the court are hard negatives, not labelled players.
+- **Motion**: frames are 0.2 s apart. Athletes move with situation-dependent velocities
+  (up to about 6 m/s in transition, static at free throws and jump balls) and the ball
+  follows its event, so consecutive frames differ while instance IDs stay stable.
 
 ## Camera presets
 
@@ -91,12 +121,12 @@ Blender; adapter tests and Reco integration run there.
 ## Realism and reproducibility limits
 
 These are **3D prototype scenes**, not a photorealistic or validated training
-corpus. The athletes have procedural anatomy, a limited set of static poses,
-basic clothing and faces. There are no motion captures, spectators, cloth
-simulation, accurate ball-player contact dynamics, or quality metrics against
-real basketball footage. Consecutive frames move the camera/ball slightly; they
-are not physically simulated play sequences. Do not infer tracking or action
-recognition validity from the exported instance identities.
+corpus. The athletes have procedural anatomy, basic clothing and faces, and one pose
+per scene: they glide between frames without animating their limbs. There are no
+motion captures, cloth simulation, accurate ball-player contact dynamics, benches or
+quality metrics against real basketball footage. Situations are plausible snapshots,
+not simulated plays. Do not infer tracking or action recognition validity from the
+exported instance identities.
 
 Seeds determine geometry, colors, camera, and light choices. Pixel reproducibility
 also requires the same worker hash, Blender version, device, sample count, and
