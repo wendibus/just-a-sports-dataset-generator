@@ -119,9 +119,6 @@ class BlenderAdapterTests(unittest.TestCase):
             self.assertFalse((root / "render/invalid").exists())
 
 
-@unittest.skipUnless(
-    os.environ.get("BLENDER_EXECUTABLE"), "set BLENDER_EXECUTABLE for local 3D integration"
-)
 def ball_projection_matches(test, result, frame, camera):
     """The independently projected ball centre lies in the ball's visible box, if any."""
     ball = next(o for o in frame["objects"] if o["label"] == "ball")
@@ -132,6 +129,9 @@ def ball_projection_matches(test, result, frame, camera):
     test.assertTrue(bx - 2 <= x <= bx + bw + 2 and by - 2 <= y <= by + bh + 2, (x, y, ball))
 
 
+@unittest.skipUnless(
+    os.environ.get("BLENDER_EXECUTABLE"), "set BLENDER_EXECUTABLE for local 3D integration"
+)
 class BlenderIntegrationTests(unittest.TestCase):
     def test_real_cycles_scene_export_and_mask_alignment(self):
         with tempfile.TemporaryDirectory() as directory:
