@@ -54,9 +54,20 @@ the plan's version, situation, ball event and checksum as an asset.
   energy, colour temperature (3800–6500 K) and number of light rows, scoreboard text.
 - **Spectators**: none, sparse or dense seated figures on the stands. They render as
   background (ID 0): people outside the court are hard negatives, not labelled players.
+- **Team benches**: in three of four scenes per team, 3–7 seated substitutes in the team
+  kit, and often a standing coach, in front of the far stands (y ≈ 9 m). They are
+  background as well: the label policy counts only people on the court as `player`. If
+  your real labels also mark bench players, say so; this is a one-line policy change.
 - **Motion**: frames are 0.2 s apart. Athletes move with situation-dependent velocities
   (up to about 6 m/s in transition, static at free throws and jump balls) and the ball
   follows its event, so consecutive frames differ while instance IDs stay stable.
+- **Animation** (layout schema 1.1): every frame has its own joints. Runners cycle their
+  legs and swing the opposite arm with a stride from their speed and face where they run;
+  defenders shuffle; dribblers push the ball down in time with the bounce; passers extend
+  their arms at the release; the shooter moves from the set point to the release at the
+  moment the ball leaves the hands. Rebounds, jump shots and jump balls follow a
+  ballistic arc from the take-off. The renderer moves each limb to the frame's joints
+  (bone lengths are constant), so `poses.json` and the rendered body always agree.
 
 ## Camera presets
 
@@ -121,10 +132,10 @@ Blender; adapter tests and Reco integration run there.
 ## Realism and reproducibility limits
 
 These are **3D prototype scenes**, not a photorealistic or validated training
-corpus. The athletes have procedural anatomy, basic clothing and faces, and one pose
-per scene: they glide between frames without animating their limbs. There are no
-motion captures, cloth simulation, accurate ball-player contact dynamics, benches or
-quality metrics against real basketball footage. Situations are plausible snapshots,
+corpus. The athletes have procedural anatomy, basic clothing and faces, and a simple
+procedural motion model rather than motion capture; the torso does not bend or twist.
+There is no cloth simulation, accurate ball-player contact dynamics or quality metric
+against real basketball footage. Situations are plausible snapshots,
 not simulated plays. Do not infer tracking or action recognition validity from the
 exported instance identities.
 

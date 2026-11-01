@@ -156,7 +156,7 @@ class BlenderIntegrationTests(unittest.TestCase):
             ball_projection_matches(self, result, frame, details["cameras"][0])
 
     def test_reco_panorama_scene_and_mask_alignment(self):
-        panorama = replace(job(), width=960, height=270, camera="reco_panorama")
+        panorama = replace(job(), width=960, height=270, camera="reco_panorama", frame_count=2)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             result = BlenderBasketballRenderer(
@@ -176,10 +176,12 @@ class BlenderIntegrationTests(unittest.TestCase):
             ball_projection_matches(self, result, frame, camera)
             self.assertGreater(export_dataset(root / "render", root / "dataset").annotations, 10)
             poses = json.loads((result.output_directory / "poses.json").read_text())
-            people = poses["frames"][0]["people"]
-            self.assertEqual({p["instance_id"] for p in people}, people_ids)
-            # Body joints project onto the rendered athletes, not beside them.
-            well_seen = [p for p in people if sum(k[2] == 2 for k in p["keypoints"][1:14]) >= 9]
-            self.assertGreaterEqual(len(well_seen), 6)
+            # Body joints project onto the rendered athletes, not beside them, in every frame:
+            # the animated limbs follow each frame's joints.
+            for pose_frame in poses["frames"]:
+                people = pose_frame["people"]
+                self.assertEqual({p["instance_id"] for p in people}, people_ids)
+                well_seen = [p for p in people if sum(k[2] == 2 for k in p["keypoints"][1:14]) >= 9]
+                self.assertGreaterEqual(len(well_seen), 6, pose_frame["frame_index"])
             crops = export_crops(root / "render", root / "crops", size=256)
             self.assertGreaterEqual(crops.crops, 8)
