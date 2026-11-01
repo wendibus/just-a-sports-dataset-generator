@@ -12,6 +12,24 @@ The first usable basketball version includes a graphical interface with preview.
 
 RF-DETR is the target detector and training framework, owned by Reco Trainer. The generator hands off COCO datasets. Ground truth is computed from scene data, not predicted by a detector. YOLO model integrations and exports are excluded from the current scope.
 
+## Implementation status
+
+| Area | Status |
+| --- | --- |
+| Recipes, deterministic planning, CLI | implemented (recipe schema 1.0/1.1) |
+| Reference renderer (geometric fixture) | implemented |
+| Blender basketball renderer, broadcast and `reco_panorama` cameras | implemented, procedural athletes |
+| Visible-pixel annotations, COCO for RF-DETR, provenance | implemented, Reco importer tested in CI |
+| OpenPose keypoints, person crops, label-preserving paste-back | implemented |
+| Local Qwen-Image-Edit-2511 repaint with consent-based install | implemented; not yet run on real weights |
+| Mac starter (dialogs, progress page, preview) | implemented |
+| Plugin model (section 3) | metadata contracts only; no discovery, isolation or signatures |
+| Secure updater (section 5) | specification only, not implemented |
+| Football, futsal and other sports | taxonomy only, no renderer |
+
+Sections 3 and 5 describe the target design so that later work keeps the same contracts;
+they are not a description of shipped behaviour.
+
 ## 2. Core pipeline
 
 `recipe -> validation -> deterministic job plan -> scene graph -> render passes -> annotations -> validation -> export + manifest`
@@ -48,9 +66,9 @@ Exporters write COCO for RF-DETR and native annotations; MOT export remains plan
 
 The current implementation supports COCO detection with instance RLE masks for the RF-DETR data workflow. A shared normalized model derives exclusive-edge pixel boxes, visible area, and column-major RLE directly from the final instance-ID pass. Hidden objects retain native identity metadata but do not produce detection rows. Native metadata and instance-ID PNGs accompany every export; RGB files live in `coco/{train,valid,test}`. Export manifest 2.0 records RF-DETR as the training target and separates native zero-based class IDs from one-based COCO category IDs.
 
-Render and export write to sibling staging directories and publish completed directories without merging into existing outputs. Export assigns whole scenes to deterministic splits and rejects identical RGB pixels across different splits. Scene inputs are bounded to 16,777,216 pixels and 32 MiB of manifest JSON; IDs currently use an 8-bit pass (background 0, objects 1..255). These limits must be revisited for larger crowds. See [docs/EXPORTS.md](docs/EXPORTS.md) for format versions, migration, and Reco importer limitations.
+Render and export write to sibling staging directories and publish completed directories without merging into existing outputs. Export assigns whole scenes to deterministic splits and rejects identical RGB pixels across different splits. Scene inputs are bounded to 16,777,216 pixels and 32 MiB of manifest JSON; IDs use an 8-bit pass (background 0, objects 1..255). That is deliberate rather than a pending limitation: only labeled objects get IDs, which is at most about 25 per frame for every Reco Trainer sport (basketball: 10 players, referees, ball, 2 hoops). Spectators, benches and other people outside the label policy render as background (ID 0), so crowds do not consume IDs. A 16-bit pass becomes necessary only if a label policy ever needs more than 255 objects per frame. See [docs/EXPORTS.md](docs/EXPORTS.md) for format versions, migration, and Reco importer limitations.
 
-## 3. Plugin model
+## 3. Plugin model (target design; only metadata contracts exist)
 
 Plugin types include sports, local render backends, local asset providers, motion generators, annotation exporters, and local model integrations. Plugins must satisfy the same offline operation and no-cost requirements as the core; there is no hosted-service fallback. Every plugin ships metadata containing:
 
@@ -77,7 +95,7 @@ Public contracts are versioned independently:
 
 Backward-compatible additions increment minor versions. Breaking changes require a major version, explicit migration, and fixtures proving old projects are either migrated safely or rejected with an actionable message.
 
-## 5. Secure updater
+## 5. Secure updater (target design; not implemented)
 
 ### Policy
 

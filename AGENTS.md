@@ -8,7 +8,7 @@ Build a cross-platform, open-source system that generates photorealistic synthet
 
 ## Current phase
 
-The project is in architecture/bootstrap phase. Do not present planned functionality as implemented. Keep README status statements accurate as code lands.
+Early implementation (0.4.x). Implemented: recipes and deterministic planning, the geometric reference renderer, the local Blender basketball renderer with broadcast and Reco-panorama cameras, visible-pixel annotations, COCO export for RF-DETR, OpenPose keypoints, person crops, label-preserving paste-back, a consent-based local Qwen-Image-Edit runtime, and the Mac starter. Specified but **not implemented**: the signed updater, plugin discovery/isolation/signatures, a cross-platform desktop shell, and every sport other than basketball. Do not present planned functionality as implemented; the status table in ARCHITECTURE.md is the reference. Keep README status statements accurate as code lands.
 
 ## Confirmed product requirements
 
@@ -35,17 +35,23 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and acceptance criteria.
 - Avoid hidden downloads or telemetry. Models and large assets require explicit user action.
 - Never commit credentials, generated datasets, model weights, or third-party assets without redistribution rights.
 
-## Expected structure
+## Structure
 
-- `src/core`: domain model and application services
-- `src/scenario`: recipe parsing, validation, deterministic expansion
-- `src/annotations`: annotation generation and geometric validation
-- `src/exporters`: format adapters and conformance checks
-- `src/plugins`: plugin API, discovery, isolation, compatibility
-- `src/updater`: manifests, signatures, compatibility, install, rollback
-- `src/cli` and `src/desktop`: thin user-interface adapters
-- `schemas`: versioned machine-readable contracts
-- `tests`: unit, property, contract, integration, and golden-data tests
+Package `src/just_a_sports_dataset_generator/`:
+
+- `core`: domain model and the Reco Trainer taxonomy
+- `scenario`: recipe parsing, validation, deterministic job expansion
+- `annotations`: visible-pixel annotations, keypoint visibility, renderer handoff validation
+- `exporters`: COCO for RF-DETR, native annotations, provenance
+- `renderers`: reference fixture and the Blender adapter; `renderers/blender_worker` is the
+  isolated GPL-3.0-or-later worker that runs inside Blender (never import it from the host)
+- `generators`: consent-based local Qwen runtime; `qwen_worker.py` runs in that runtime
+- `crops.py`, `composite.py`, `preview.py`: person crops, label-preserving paste-back, previews
+- `plugins`: plugin metadata contracts only (no discovery or isolation yet)
+- `cli`: command-line interface; `macos/` holds the Mac starter and its PyInstaller spec
+
+Planned: `updater` (signed manifests, atomic install, rollback) and a desktop shell.
+`schemas` holds versioned contracts; `tests` holds unit, contract and integration tests.
 
 ## Change workflow
 
