@@ -59,21 +59,43 @@ the same command is run again; finished people are skipped.
 
 `generate-crops CROPS --output GENERATED` repaints each crop with Qwen-Image-Edit-2511
 (GGUF `--quant`, default Q4_K_M) and the 4-step Lightning LoRA. The model receives the
-RGB crop and the pose skeleton as two input images and a built-in prompt (player or
-referee) asking for a photorealistic person in exactly that pose, position and size,
-with the original kit colours; `--prompt` replaces it. Seeds are derived from `--seed`
-and the crop ID, so a rerun reproduces a crop. `--device auto` uses Apple Metal (MPS),
-then CUDA, then CPU. If the Lightning LoRA cannot be applied to the quantized model, the
-run falls back to 30 steps with classifier-free guidance and says so.
+RGB crop and the pose skeleton as two input images and a built-in prompt; `--prompt`
+replaces it. Seeds are derived from `--seed` and the crop ID, so a rerun reproduces a
+crop. `--device auto` uses Apple Metal (MPS), then CUDA, then CPU. If the Lightning LoRA
+cannot be applied to the quantized model, the run falls back to 30 steps with
+classifier-free guidance and says so.
+
+The built-in prompt (version 2, recorded in `generation.json`) was revised after the
+first Mac test, in which "sleeveless jersey with shoulder straps" produced overall-style
+straps with buckles and two of three crouched poses came out standing upright:
+
+- players wear "a classic basketball tank-top jersey with wide shoulder panels sewn to
+  the jersey, a deep scoop neckline, piped armholes and the number printed on the chest"
+  and knee-length shorts, **in exactly the colours of image 1** (no colour is named);
+  referees wear a grey striped short-sleeved shirt and black trousers;
+- each crop carries its planner pose family (`pose_family` in `crops.json`), and the
+  prompt names that stance explicitly, for example "in a low defensive stance, knees
+  deeply bent, feet wide apart, arms spread out";
+- a negative prompt (straps, buckles, overalls, backpack, square neckline, standing
+  upright, deformed hands, …) applies to the 30-step fallback; the 4-step Lightning
+  schedule runs without classifier-free guidance, so there the wording of the positive
+  prompt does the work.
+
+**Speed.** Qwen works at most at `--resolution` pixels per side (default 768; 1024 is
+sharper and roughly 1.8× slower), then the result is scaled back to the crop size. With
+Lightning, a crop takes 4 denoising steps instead of the 40 used in the first manual
+test, which took about 26 minutes per image (40 × ~39 s at 640 × 960 with mflux, 8-bit).
+Per-step time on MPS has not been measured for this runtime yet; `generation.jsonl`
+records the seconds per crop, so the first run gives the number.
 
 `generation.json` records the model, quantization, packages, checksums and settings;
 `generation.jsonl` adds seed, steps and time per person; `qwen.log` keeps the worker
 output.
 
-Expect roughly 30 GB of memory use and one to a few minutes per person on an Apple
-M-series Mac with 48 GB; these figures come from public reports for the same model, not
-from measurements in this project. The end-to-end run on real weights has not been
-verified yet; the code path is tested with a stand-in runtime.
+On an M4 Pro (48 GB), loading the model took 195 s once per run (measured while a Reco
+Trainer training ran in parallel). The manual mflux test of the same model peaked at about
+39 GB, so do not run Qwen next to another GPU-heavy job: both slow down and the other job
+can run out of memory.
 
 ## Using another tool
 

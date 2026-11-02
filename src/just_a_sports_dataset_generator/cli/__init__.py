@@ -106,6 +106,12 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--device", choices=("auto", "mps", "cuda", "cpu"), default="auto")
         command.add_argument("--prompt", help="replace the built-in player/referee prompts")
         command.add_argument("--quant", choices=QUANTS, default="Q4_K_M")
+        command.add_argument(
+            "--resolution",
+            type=int,
+            default=768,
+            help="largest side Qwen works at (default 768; 1024 is slower and sharper)",
+        )
         command.add_argument("--yes", action="store_true", help="approve a needed download")
     preview = subcommands.add_parser(
         "preview", help="write an offline RGB and colored-mask preview"
@@ -152,6 +158,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             device=args.device,
             prompt=args.prompt,
             quant=args.quant,
+            resolution=args.resolution,
             progress=report,
         )
         print(f"{made.generated} von {made.total} Personen generiert in {args.output}")
@@ -172,6 +179,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             device=args.device,
             prompt=args.prompt,
             quant=args.quant,
+            resolution=args.resolution,
             progress=report,
         )
         merged = composite_crops(

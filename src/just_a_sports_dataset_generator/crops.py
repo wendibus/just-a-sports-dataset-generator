@@ -122,6 +122,21 @@ def _poses(scene: Scene) -> dict[tuple[int, int], list[list[float]]]:
 FACE = frozenset({0, 14, 15, 16, 17})
 
 
+def _pose_families(scene: Scene) -> dict[int, str]:
+    """Pose family per instance from the planner's layout.json, if the scene has one."""
+    path = scene.path.parent / "layout.json"
+    if not path.is_file() or path.stat().st_size > 32 * 1024 * 1024:
+        return {}
+    athletes = mapping(json.loads(path.read_text(encoding="utf-8"))).get("athletes", [])
+    families: dict[int, str] = {}
+    for raw in sequence(athletes):
+        athlete = mapping(raw)
+        family = mapping(athlete.get("pose", {})).get("family")
+        if isinstance(family, str) and family.isidentifier():
+            families[integer(athlete.get("instance_id"), 1)] = family
+    return families
+
+
 def draw_openpose(points: list[list[float]], size: int) -> Image.Image:
     """Render BODY_18 keypoints (crop pixel coordinates) on black.
 
@@ -176,6 +191,7 @@ def export_crops(
         for path in paths:
             scene = load_scene(path)
             poses = _poses(scene)
+            families = _pose_families(scene)
             for frame in scene.frames:
                 rgb, instances, annotations = load_frame(scene, frame)
                 for annotation in annotations:
@@ -223,6 +239,7 @@ def export_crops(
                             "frame_index": frame.index,
                             "instance_id": identity,
                             "label": annotation.label,
+                            "pose_family": families.get(annotation.instance_id),
                             "source_rgb": str(frame.rgb.relative_to(source)),
                             "bbox_xywh": list(annotation.bbox_xywh),
                             "visible_area": annotation.visible_area,

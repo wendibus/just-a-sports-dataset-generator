@@ -29,6 +29,8 @@ from .qwen_setup import (
 )
 
 WORKER = Path(__file__).with_name("qwen_worker.py")
+PROMPT_VERSION = 2
+"""Must match qwen_worker.PROMPT_VERSION; part of a run's fingerprint so runs never mix."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +71,7 @@ def generate_crops(
     device: str = "auto",
     prompt: str | None = None,
     quant: str = "Q4_K_M",
+    resolution: int = 768,
     home: Path | None = None,
     progress: Callable[[str], None] = print,
 ) -> GenerateResult:
@@ -76,6 +79,8 @@ def generate_crops(
         raise ValueError("steps must be an integer between 1 and 100")
     if type(seed) is not int or seed < 0:
         raise ValueError("seed must be a non-negative integer")
+    if type(resolution) is not int or not 256 <= resolution <= 2048:
+        raise ValueError("resolution must be an integer between 256 and 2048")
     if device not in ("auto", "mps", "cuda", "cpu"):
         raise ValueError("device must be auto, mps, cuda or cpu")
     crops, output = crops.resolve(), output.absolute()
@@ -85,7 +90,14 @@ def generate_crops(
     crops_sha256 = hashlib.sha256(index_path.read_bytes()).hexdigest()
     total = len(json.loads(index_path.read_text(encoding="utf-8"))["crops"])
     header_path = output / "generation.json"
-    settings = {"steps": steps, "seed": seed, "prompt": prompt, "quant": quant}
+    settings = {
+        "steps": steps,
+        "seed": seed,
+        "prompt": prompt,
+        "prompt_version": PROMPT_VERSION,
+        "quant": quant,
+        "resolution": resolution,
+    }
     if output.exists():
         try:
             header = json.loads(header_path.read_text(encoding="utf-8"))
@@ -121,6 +133,7 @@ def generate_crops(
             "seed": seed,
             "device": device,
             "prompt": prompt,
+            "resolution": resolution,
         },
     )
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONHOME", "PYTHONPATH")}

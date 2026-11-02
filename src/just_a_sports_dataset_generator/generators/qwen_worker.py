@@ -15,23 +15,59 @@ import sys
 import time
 from pathlib import Path
 
-PROMPTS = {
-    "player": (
-        "Repaint the person in image 1 as a photorealistic basketball player photographed in "
-        "an indoor sports hall. Use exactly the body pose of the skeleton in image 2. Keep the "
-        "person's position, size and outline, the camera angle and the background unchanged. "
-        "Keep the jersey and shorts colours and the jersey number of image 1. Natural skin, "
-        "realistic hair and fabric, sharp sports photography."
-    ),
-    "goalkeeper": None,  # same as player
-    "referee": (
-        "Repaint the person in image 1 as a photorealistic basketball referee in a grey and "
-        "black striped shirt and black trousers, photographed in an indoor sports hall. Use "
-        "exactly the body pose of the skeleton in image 2. Keep the person's position, size "
-        "and outline, the camera angle and the background unchanged. Natural skin, realistic "
-        "hair and fabric, sharp sports photography."
-    ),
+PROMPT_VERSION = 2
+"""2: tank-top jersey description, pose hint per pose family, colours taken from image 1."""
+JERSEY = (
+    "a classic basketball tank-top jersey with wide shoulder panels sewn to the jersey, a deep "
+    "scoop neckline, piped armholes and the number printed on the chest, made of light mesh "
+    "fabric, and loose knee-length basketball shorts"
+)
+REFEREE_KIT = (
+    "a grey short-sleeved referee shirt with thin black vertical stripes, a collar, and black "
+    "trousers"
+)
+POSE_HINTS = {
+    "stand": "standing relaxed",
+    "run": "running mid-stride with arms swinging",
+    "defend": "in a low defensive stance, knees deeply bent, feet wide apart, arms spread out",
+    "dribble": "dribbling the ball, knees bent, body low, one hand pushing the ball down",
+    "shoot": "shooting, both arms extended above the head",
+    "pass": "passing, both arms pushing forward from the chest",
+    "catch": "reaching forward with both hands to catch the ball",
+    "rebound": "jumping for a rebound with both arms stretched upwards",
+    "signal": "raising one arm high to signal",
 }
+NEGATIVE_PROMPT = (
+    "straps, buckles, suspenders, overalls, apron, backpack, square neckline, vest, standing "
+    "upright, straight legs, extra limbs, extra fingers, deformed hands, cartoon, 3D render, "
+    "plastic skin, blurry, watermark, text artifacts"
+)
+
+
+def build_prompt(crop):
+    """Prompt for one crop: kit description, explicit pose hint, keep colours and outline."""
+    referee = crop.get("label") == "referee"
+    hint = POSE_HINTS.get(crop.get("pose_family") or "")
+    pose = (
+        f"The {'referee' if referee else 'player'} is {hint}, exactly as in image 1. "
+        if hint
+        else ""
+    )
+    kit = (
+        f"wears {REFEREE_KIT}"
+        if referee
+        else f"wears {JERSEY}, in exactly the colours of image 1 and with the same number"
+    )
+    return (
+        f"Repaint the 3D figure in image 1 as a photorealistic basketball "
+        f"{'referee' if referee else 'player'} in an indoor sports hall. {pose}"
+        "Keep exactly the body pose of image 1 and of the skeleton in image 2: the same knee "
+        "bend, arm positions, body lean, position, size and outline, and the same camera angle. "
+        f"The {'referee' if referee else 'player'} {kit}. Keep the background unchanged. "
+        "Natural skin and hair, anatomically correct hands, sharp sports photography."
+    )
+
+
 # Scheduler published for the Qwen-Image Lightning LoRAs (4-step, no CFG).
 LIGHTNING_SCHEDULER = {
     "base_image_seq_len": 256,
@@ -125,7 +161,9 @@ def main():
         f"load_seconds={time.monotonic() - started:.0f}"
     )
     size = index["size"]
-    work = max(256, size // 16 * 16)  # the transformer needs multiples of 16
+    # Work at most at the requested resolution: cost grows with the pixel count, and a
+    # repainted person is downscaled for the dataset anyway. Multiples of 16 are required.
+    work = max(256, min(size, request.get("resolution") or size) // 16 * 16)
     records = output / "generation.jsonl"
     for number, crop in enumerate(todo, 1):
         began = time.monotonic()
@@ -134,12 +172,14 @@ def main():
             Image.open(crops_dir / crop["files"]["pose"]) as pose,
         ):
             images = [rgb.convert("RGB"), pose.convert("RGB")]
-        prompt = request.get("prompt") or PROMPTS.get(crop["label"]) or PROMPTS["player"]
+        prompt = request.get("prompt") or build_prompt(crop)
         seed = crop_seed(request["seed"], crop["id"])
         result = pipe(
             image=images,
             prompt=prompt,
-            negative_prompt=" ",
+            # Only used with classifier-free guidance (the 30-step fallback); the 4-step
+            # Lightning schedule runs without it (true_cfg_scale 1).
+            negative_prompt=NEGATIVE_PROMPT if cfg > 1 else " ",
             true_cfg_scale=cfg,
             guidance_scale=1.0,
             num_inference_steps=steps,

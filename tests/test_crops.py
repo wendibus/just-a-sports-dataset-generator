@@ -105,6 +105,10 @@ class CropExportTests(unittest.TestCase):
             [crop] = index["crops"]
             # bbox 10x30 centred at (25, 25); side = ceil(30 * 1.5) = 45; scale = 90 / 45.
             self.assertEqual(crop["bbox_xywh"], [20, 10, 10, 30])
+            # The planner's pose family travels with the crop for generator prompts.
+            layout = read_json(source / "scene-000000/layout.json")
+            family = next(a for a in layout["athletes"] if a["instance_id"] == 10)["pose"]["family"]
+            self.assertEqual(crop["pose_family"], family)
             self.assertEqual(crop["crop_box_xyxy"], [2, 2, 47, 47])
             self.assertEqual(crop["scale"], 2.0)
             self.assertEqual(crop["keypoints"][1], [46.5, 46.5, 2])

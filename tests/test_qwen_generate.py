@@ -249,6 +249,21 @@ class QwenGenerateTests(unittest.TestCase):
         self.assertIn("torchvision==0.24.1", calls[0][1])
         self.assertEqual(json.loads(manifest_path.read_text())["packages"], list(PACKAGES))
 
+    def test_work_resolution_is_capped_and_results_return_at_crop_size(self):
+        export_crops(self.source, self.root / "big-crops", size=1024)
+        generate_crops(
+            self.root / "big-crops",
+            self.root / "big-gen",
+            confirm=never,
+            resolution=512,
+            progress=lambda _: None,
+        )
+        self.assertEqual({tuple(c["size"]) for c in self.calls()}, {(512, 512)})
+        with Image.open(self.root / "big-gen/scene-000000-f000000-i010.png") as image:
+            self.assertEqual(image.size, (1024, 1024))
+        with self.assertRaises(ValueError):
+            generate_crops(self.root / "big-crops", self.root / "x", confirm=never, resolution=64)
+
 
 if __name__ == "__main__":
     unittest.main()

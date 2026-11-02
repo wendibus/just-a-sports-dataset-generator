@@ -183,6 +183,13 @@
               "minItems": 3,
               "maxItems": 3
             }
+          },
+          "pose_family": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Planner pose family (e.g. dribble, defend) when the scene has a layout.json; used for generator prompts."
           }
         }
       }
