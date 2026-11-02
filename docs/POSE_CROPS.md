@@ -59,8 +59,9 @@ the same command is run again; finished people are skipped.
 
 `generate-crops CROPS --output GENERATED` repaints each crop with Qwen-Image-Edit-2511
 (GGUF `--quant`, default Q4_K_M) and the 4-step Lightning LoRA. The model receives the
-RGB crop and the pose skeleton as two input images and a built-in prompt; `--prompt`
-replaces it. Seeds are derived from `--seed` and the crop ID, so a rerun reproduces a
+RGB crop, with everything outside the person's inpaint mask blurred, and a built-in
+prompt; `--prompt` replaces it. `--pose-image` adds the OpenPose skeleton as a second
+input image (roughly twice the tokens). Seeds are derived from `--seed` and the crop ID, so a rerun reproduces a
 crop. `--device auto` uses Apple Metal (MPS), then CUDA, then CPU. If the Lightning LoRA
 cannot be applied to the quantized model, the run falls back to 30 steps with
 classifier-free guidance and says so.
@@ -80,6 +81,20 @@ straps with buckles and two of three crouched poses came out standing upright:
   upright, deformed hands, …) applies to the 30-step fallback; the 4-step Lightning
   schedule runs without classifier-free guidance, so there the wording of the positive
   prompt does the work.
+
+Version 3 follows the second Mac test (three crops, M4 Pro, Reco training in parallel):
+
+| Crop | Result | Cause | Change |
+| --- | --- | --- | --- |
+| shoot | photorealistic, kit and pose right | — | — |
+| dribble | pose right, but stiff "shoulder panels" drawn as wings and a 3D-game look | the phrase "wide shoulder panels" | phrase removed; "a real photograph, not a 3D render, not a doll" |
+| defend | a second, distorted player, rock-like shoulders, romper shorts | another player inside the crop was repainted too | everything outside the person's mask is blurred before generation; "only one person" |
+
+**Tokens.** diffusers' `QwenImageEditPlusPipeline` encodes every input image at
+1024 × 1024 (4096 tokens each). With a 768 px output and two inputs, the transformer
+processed about 10,500 tokens per step, and one crop took 12–15 minutes (714–878 s for 4
+steps, with the training running alongside). The worker now encodes the inputs at the work
+resolution and sends only the RGB crop by default: about 4,600 tokens at 768 px.
 
 **Speed.** Qwen works at most at `--resolution` pixels per side (default 768; 1024 is
 sharper and roughly 1.8× slower), then the result is scaled back to the crop size. With

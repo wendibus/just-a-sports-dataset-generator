@@ -17,12 +17,14 @@ import sys
 import time
 from pathlib import Path
 
-PROMPT_VERSION = 2
-"""2: tank-top jersey description, pose hint per pose family, colours taken from image 1."""
+PROMPT_VERSION = 3
+"""2: tank-top jersey description, pose hint per pose family, colours taken from image 1.
+3: no "shoulder panels" (Qwen drew pads and wings), real-photo wording against the 3D look,
+   pose skeleton optional, background outside the person blurred before generation."""
 JERSEY = (
-    "a classic basketball tank-top jersey with wide shoulder panels sewn to the jersey, a deep "
-    "scoop neckline, piped armholes and the number printed on the chest, made of light mesh "
-    "fabric, and loose knee-length basketball shorts"
+    "a thin, loose sleeveless basketball jersey of lightweight fabric with simple round "
+    "armholes, a scoop neckline and the number printed on the chest, and loose knee-length "
+    "basketball shorts"
 )
 REFEREE_KIT = (
     "a grey short-sleeved referee shirt with thin black vertical stripes, a collar, and black "
@@ -40,15 +42,16 @@ POSE_HINTS = {
     "signal": "raising one arm high to signal",
 }
 NEGATIVE_PROMPT = (
-    "straps, buckles, suspenders, overalls, apron, backpack, square neckline, vest, standing "
+    "shoulder pads, wings, straps, buckles, suspenders, overalls, apron, backpack, square neckline, vest, standing "
     "upright, straight legs, extra limbs, extra fingers, deformed hands, cartoon, 3D render, "
-    "plastic skin, blurry, watermark, text artifacts"
+    "plastic skin, doll, action figure, second person, blurry, watermark, text artifacts"
 )
 
 
-def build_prompt(crop):
+def build_prompt(crop, pose_image=False):
     """Prompt for one crop: kit description, explicit pose hint, keep colours and outline."""
     referee = crop.get("label") == "referee"
+    skeleton = " and of the skeleton in image 2" if pose_image else ""
     hint = POSE_HINTS.get(crop.get("pose_family") or "")
     pose = (
         f"The {'referee' if referee else 'player'} is {hint}, exactly as in image 1. "
@@ -63,10 +66,12 @@ def build_prompt(crop):
     return (
         f"Repaint the 3D figure in image 1 as a photorealistic basketball "
         f"{'referee' if referee else 'player'} in an indoor sports hall. {pose}"
-        "Keep exactly the body pose of image 1 and of the skeleton in image 2: the same knee "
-        "bend, arm positions, body lean, position, size and outline, and the same camera angle. "
-        f"The {'referee' if referee else 'player'} {kit}. Keep the background unchanged. "
-        "Natural skin and hair, anatomically correct hands, sharp sports photography."
+        f"Keep exactly the body pose of image 1{skeleton}: the same knee bend, arm positions, "
+        "body lean, position, size and outline, and the same camera angle. "
+        f"The {'referee' if referee else 'player'} {kit}. Only one person, the background "
+        "stays out of focus. A real photograph of a real athlete, not a 3D render, not a doll "
+        "or action figure: natural skin texture and hair, anatomically correct hands, matte "
+        "fabric with natural folds, sharp sports photography."
     )
 
 
@@ -125,6 +130,32 @@ def is_out_of_memory(exc):
 def smaller(work):
     """Next work resolution after an out-of-memory error (about 30 % fewer pixels)."""
     return max(256, int(work * 0.84) // 16 * 16)
+
+
+def isolate(rgb, inpaint):
+    """Blur everything outside the person's inpaint mask.
+
+    Other players inside the crop were repainted as a second, distorted person; blurred they
+    only provide light and colour context. The host pastes back the person only.
+    """
+    from PIL import Image, ImageFilter
+
+    blurred = rgb.filter(ImageFilter.GaussianBlur(max(2, rgb.width // 24)))
+    return Image.composite(rgb, blurred, inpaint)
+
+
+def set_condition_size(work):
+    """Encode the input images at the work resolution instead of diffusers' fixed 1024 px.
+
+    QwenImageEditPlusPipeline turns every input image into 1024 x 1024 latents (4096 tokens
+    each); with a 768 px output and two inputs the transformer saw ~10,500 tokens per step.
+    """
+    try:
+        from diffusers.pipelines.qwenimage import pipeline_qwenimage_edit_plus as module
+    except ImportError:
+        return
+    if hasattr(module, "VAE_IMAGE_SIZE"):
+        module.VAE_IMAGE_SIZE = work * work
 
 
 def load_pipeline(torch, request, log):
@@ -192,17 +223,24 @@ def main():
     records = output / "generation.jsonl"
     for number, crop in enumerate(todo, 1):
         began = time.monotonic()
-        with (
-            Image.open(crops_dir / crop["files"]["rgb"]) as rgb,
-            Image.open(crops_dir / crop["files"]["pose"]) as pose,
-        ):
-            images = [rgb.convert("RGB"), pose.convert("RGB")]
-        prompt = request.get("prompt") or build_prompt(crop)
+        pose_image = bool(request.get("pose_image"))
+        with Image.open(crops_dir / crop["files"]["rgb"]) as rgb:
+            source = rgb.convert("RGB")
+        inpaint_path = crops_dir / crop["files"].get("inpaint", "")
+        if inpaint_path.is_file():
+            with Image.open(inpaint_path) as inpaint:
+                source = isolate(source, inpaint.convert("L"))
+        images = [source]
+        if pose_image:
+            with Image.open(crops_dir / crop["files"]["pose"]) as pose:
+                images.append(pose.convert("RGB"))
+        prompt = request.get("prompt") or build_prompt(crop, pose_image)
         seed = crop_seed(request["seed"], crop["id"])
         # On "out of memory": free the cache and retry at the same size, then smaller.
         attempt_work, attempts = work, 0
         while True:
             try:
+                set_condition_size(attempt_work)
                 result = pipe(
                     image=images,
                     prompt=prompt,

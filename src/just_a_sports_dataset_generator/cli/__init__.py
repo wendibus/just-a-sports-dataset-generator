@@ -112,6 +112,11 @@ def _parser() -> argparse.ArgumentParser:
             default=768,
             help="largest side Qwen works at (default 768; 1024 is slower and sharper)",
         )
+        command.add_argument(
+            "--pose-image",
+            action="store_true",
+            help="also give Qwen the OpenPose skeleton (more tokens, roughly 2x slower)",
+        )
         command.add_argument("--yes", action="store_true", help="approve a needed download")
     preview = subcommands.add_parser(
         "preview", help="write an offline RGB and colored-mask preview"
@@ -159,6 +164,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             prompt=args.prompt,
             quant=args.quant,
             resolution=args.resolution,
+            pose_image=args.pose_image,
             progress=report,
         )
         print(f"{made.generated} von {made.total} Personen generiert in {args.output}")
@@ -180,6 +186,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             prompt=args.prompt,
             quant=args.quant,
             resolution=args.resolution,
+            pose_image=args.pose_image,
             progress=report,
         )
         merged = composite_crops(

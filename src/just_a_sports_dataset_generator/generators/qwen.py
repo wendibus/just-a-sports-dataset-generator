@@ -29,7 +29,7 @@ from .qwen_setup import (
 )
 
 WORKER = Path(__file__).with_name("qwen_worker.py")
-PROMPT_VERSION = 2
+PROMPT_VERSION = 3
 """Must match qwen_worker.PROMPT_VERSION; part of a run's fingerprint so runs never mix."""
 
 
@@ -72,6 +72,7 @@ def generate_crops(
     prompt: str | None = None,
     quant: str = "Q4_K_M",
     resolution: int = 768,
+    pose_image: bool = False,
     home: Path | None = None,
     progress: Callable[[str], None] = print,
 ) -> GenerateResult:
@@ -97,6 +98,7 @@ def generate_crops(
         "prompt_version": PROMPT_VERSION,
         "quant": quant,
         "resolution": resolution,
+        "pose_image": pose_image,
     }
     if output.exists():
         try:
@@ -134,6 +136,7 @@ def generate_crops(
             "device": device,
             "prompt": prompt,
             "resolution": resolution,
+            "pose_image": pose_image,
         },
     )
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONHOME", "PYTHONPATH")}

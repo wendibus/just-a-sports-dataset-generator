@@ -171,7 +171,7 @@ class QwenGenerateTests(unittest.TestCase):
         calls = self.calls()
         self.assertEqual([c["steps"] for c in calls], [4, 4])
         self.assertEqual([c["cfg"] for c in calls], [1.0, 1.0])
-        self.assertEqual(calls[0]["call"], 2)  # RGB crop and pose skeleton
+        self.assertEqual(calls[0]["call"], 1)  # RGB crop only; the skeleton is opt-in
         self.assertEqual(calls[0]["size"], [256, 256])  # at least 256, multiple of 16
         with Image.open(self.root / "gen/scene-000000-f000000-i010.png") as image:
             self.assertEqual(image.size, (100, 100))  # back at crop size
@@ -266,6 +266,17 @@ class QwenGenerateTests(unittest.TestCase):
             self.assertEqual(image.size, (1024, 1024))
         with self.assertRaises(ValueError):
             generate_crops(self.root / "big-crops", self.root / "x", confirm=never, resolution=64)
+
+    def test_pose_image_is_opt_in(self):
+        generate_crops(
+            self.root / "crops",
+            self.root / "gen",
+            confirm=never,
+            pose_image=True,
+            progress=lambda _: None,
+        )
+        self.assertEqual({c["call"] for c in self.calls()}, {2})
+        self.assertTrue(read_json(self.root / "gen/generation.json")["settings"]["pose_image"])
 
     def test_out_of_memory_frees_the_cache_and_retries_smaller(self):
         export_crops(self.source, self.root / "big-crops", size=1024)
