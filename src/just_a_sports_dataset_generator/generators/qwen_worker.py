@@ -158,6 +158,22 @@ def set_condition_size(work):
         module.VAE_IMAGE_SIZE = work * work
 
 
+def interleave(crops):
+    """Alternate pose families, so a run stopped by its time limit still shows every pose."""
+    groups = {}
+    for crop in crops:
+        groups.setdefault(crop.get("pose_family") or "", []).append(crop)
+    order = sorted(
+        (
+            (rank, family, crop)
+            for family, items in groups.items()
+            for rank, crop in enumerate(items)
+        ),
+        key=lambda entry: (entry[0], entry[1]),
+    )
+    return [crop for _, _, crop in order]
+
+
 def load_pipeline(torch, request, log):
     from diffusers import (
         FlowMatchEulerDiscreteScheduler,
@@ -203,7 +219,7 @@ def main():
     crops_dir, output = Path(request["crops_dir"]), Path(request["output_dir"])
     index = json.loads((crops_dir / "crops.json").read_text(encoding="utf-8"))
     crops = [c for c in index["crops"] if not request.get("ids") or c["id"] in request["ids"]]
-    todo = [c for c in crops if not (output / f"{c['id']}.png").is_file()]
+    todo = interleave([c for c in crops if not (output / f"{c['id']}.png").is_file()])
     log(f"QWEN_TODO {len(todo)}/{len(crops)}")
     if not todo:
         return
@@ -221,7 +237,13 @@ def main():
     # repainted person is downscaled for the dataset anyway. Multiples of 16 are required.
     work = max(256, min(size, request.get("resolution") or size) // 16 * 16)
     records = output / "generation.jsonl"
+    deadline = request.get("deadline")
     for number, crop in enumerate(todo, 1):
+        if deadline and time.time() >= deadline:
+            log(
+                f"QWEN_WARNING Zeitlimit erreicht nach {number - 1} Personen; Rest beim nächsten Lauf"
+            )
+            break
         began = time.monotonic()
         pose_image = bool(request.get("pose_image"))
         with Image.open(crops_dir / crop["files"]["rgb"]) as rgb:

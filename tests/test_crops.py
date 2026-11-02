@@ -13,7 +13,7 @@ from PIL import Image
 from just_a_sports_dataset_generator.annotations import AnnotationError
 from just_a_sports_dataset_generator.annotations.poses import OPENPOSE_18
 from just_a_sports_dataset_generator.core import SceneJob, labels_for_sport
-from just_a_sports_dataset_generator.crops import export_crops
+from just_a_sports_dataset_generator.crops import _isolated, export_crops
 from just_a_sports_dataset_generator.renderers.blender import BlenderBasketballRenderer
 
 ROOT = Path(__file__).parents[1]
@@ -144,6 +144,25 @@ class CropExportTests(unittest.TestCase):
             with self.assertRaisesRegex(AnnotationError, "no poses.json"):
                 export_crops(legacy, root / "legacy-crops")
             self.assertFalse((root / "legacy-crops").exists())
+
+    def test_isolated_keeps_only_whole_people_standing_alone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = render(root, second_player=True)
+            # Player 10 has a wrist outside the image; player 11 has player 10 in its crop.
+            result = export_crops(source, root / "alone", size=90, isolated=True)
+            self.assertEqual((result.crops, result.skipped_not_isolated), (0, 2))
+            self.assertTrue(read_json(root / "alone/crops.json")["isolated"])
+        ids = Image.new("L", (100, 100), 0)
+        ids.paste(5, (40, 30, 50, 70))
+        ids.paste(6, (80, 10, 81, 20))  # 10 px of someone else: below 3 % of the box
+        visible = [[45.0, 50.0, 2.0]] * len(OPENPOSE_18)
+        self.assertTrue(_isolated((20, 20, 70, 80), visible, ids, [6]))
+        self.assertFalse(_isolated((-5, 20, 45, 80), visible, ids, [6]))  # cut by the frame
+        hidden = [*visible[:9], [45.0, 50.0, 1.0], *visible[10:]]  # right knee occluded
+        self.assertFalse(_isolated((20, 20, 70, 80), hidden, ids, [6]))
+        ids.paste(6, (52, 30, 60, 70))  # a neighbour right next to the person
+        self.assertFalse(_isolated((20, 20, 70, 80), visible, ids, [6]))
 
 
 if __name__ == "__main__":

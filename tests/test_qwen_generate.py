@@ -185,7 +185,7 @@ class QwenGenerateTests(unittest.TestCase):
         header = read_json(self.root / "gen/generation.json")
         self.assertEqual(header["settings"]["steps"], 4)
         # Resume: finished crops are skipped; a deleted one is regenerated with the same seed.
-        first_seed = calls[0]["seed"]
+        first_seed = next(r["seed"] for r in records if r["id"].endswith("i010"))
         (self.root / "gen/scene-000000-f000000-i010.png").unlink()
         generate_crops(
             self.root / "crops", self.root / "gen", confirm=never, progress=lambda _: None
@@ -266,6 +266,24 @@ class QwenGenerateTests(unittest.TestCase):
             self.assertEqual(image.size, (1024, 1024))
         with self.assertRaises(ValueError):
             generate_crops(self.root / "big-crops", self.root / "x", confirm=never, resolution=64)
+
+    def test_time_limit_stops_before_the_next_person(self):
+        messages: list[str] = []
+        with patch("just_a_sports_dataset_generator.generators.qwen.time.time", return_value=0.0):
+            result = generate_crops(
+                self.root / "crops",
+                self.root / "gen",
+                confirm=never,
+                time_limit=1e-9,
+                progress=messages.append,
+            )
+        self.assertEqual(result.generated, 0)
+        self.assertTrue(any("Zeitlimit" in m for m in messages))
+        # The budget is not a setting: the same folder continues without it.
+        result = generate_crops(
+            self.root / "crops", self.root / "gen", confirm=never, progress=lambda _: None
+        )
+        self.assertEqual(result.generated, 2)
 
     def test_pose_image_is_opt_in(self):
         generate_crops(

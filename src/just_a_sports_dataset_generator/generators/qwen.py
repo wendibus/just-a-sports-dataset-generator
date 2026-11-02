@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -73,6 +74,7 @@ def generate_crops(
     quant: str = "Q4_K_M",
     resolution: int = 768,
     pose_image: bool = False,
+    time_limit: float | None = None,
     home: Path | None = None,
     progress: Callable[[str], None] = print,
 ) -> GenerateResult:
@@ -82,6 +84,8 @@ def generate_crops(
         raise ValueError("seed must be a non-negative integer")
     if type(resolution) is not int or not 256 <= resolution <= 2048:
         raise ValueError("resolution must be an integer between 256 and 2048")
+    if time_limit is not None and not time_limit > 0:
+        raise ValueError("time_limit must be a positive number of minutes")
     if device not in ("auto", "mps", "cuda", "cpu"):
         raise ValueError("device must be auto, mps, cuda or cpu")
     crops, output = crops.resolve(), output.absolute()
@@ -137,6 +141,8 @@ def generate_crops(
             "prompt": prompt,
             "resolution": resolution,
             "pose_image": pose_image,
+            # Not part of the settings: a resumed run may get a different budget.
+            "deadline": time.time() + time_limit * 60 if time_limit else None,
         },
     )
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONHOME", "PYTHONPATH")}

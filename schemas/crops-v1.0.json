@@ -37,6 +37,10 @@
       "type": "integer",
       "minimum": 1
     },
+    "isolated": {
+      "type": "boolean",
+      "description": "Only fully visible people without other people close by were exported."
+    },
     "pose_format": {
       "const": "openpose-18"
     },

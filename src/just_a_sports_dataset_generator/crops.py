@@ -81,6 +81,7 @@ class CropResult:
     output_directory: Path
     crops: int
     skipped_small: int
+    skipped_not_isolated: int = 0
 
 
 def _poses(scene: Scene) -> dict[tuple[int, int], list[list[float]]]:
@@ -120,6 +121,26 @@ def _poses(scene: Scene) -> dict[tuple[int, int], list[list[float]]]:
 
 
 FACE = frozenset({0, 14, 15, 16, 17})
+BODY = tuple(index for index in range(len(OPENPOSE_18)) if index not in FACE)
+OTHER_PEOPLE_LIMIT = 0.03
+"""``isolated``: at most this share of the crop box may show other players or referees."""
+
+
+def _isolated(
+    box: tuple[int, int, int, int],
+    points: list[list[float]],
+    instances: Image.Image,
+    others: list[int],
+) -> bool:
+    """Whole person in the frame with margin, every body joint visible, nobody else close."""
+    left, top, right, bottom = box
+    if left < 0 or top < 0 or right > instances.width or bottom > instances.height:
+        return False
+    if any(points[index][2] != 2 for index in BODY):
+        return False
+    histogram = instances.crop(box).histogram()
+    crowded = sum(histogram[identity] for identity in others)
+    return crowded <= OTHER_PEOPLE_LIMIT * (right - left) * (bottom - top)
 
 
 def _pose_families(scene: Scene) -> dict[int, str]:
@@ -168,7 +189,9 @@ def export_crops(
     margin: float = 0.25,
     min_height: int = 24,
     dilate: int = 9,
+    isolated: bool = False,
 ) -> CropResult:
+    """Export person crops; ``isolated`` keeps only fully visible people standing alone."""
     if type(size) is not int or not 64 <= size <= 4096:
         raise ValueError("size must be an integer between 64 and 4096")
     if not 0 <= margin <= 2:
@@ -186,7 +209,7 @@ def export_crops(
     if not paths:
         raise AnnotationError("no scene.json renderer outputs found")
     items: list[dict[str, object]] = []
-    skipped = 0
+    skipped = crowded = 0
     with new_directory(destination) as staging:
         for path in paths:
             scene = load_scene(path)
@@ -194,6 +217,7 @@ def export_crops(
             families = _pose_families(scene)
             for frame in scene.frames:
                 rgb, instances, annotations = load_frame(scene, frame)
+                people = [a.instance_id for a in annotations if a.label in POSE_LABELS]
                 for annotation in annotations:
                     if annotation.label not in POSE_LABELS:
                         continue
@@ -209,6 +233,10 @@ def export_crops(
                     top = round(y + height / 2 - side / 2)
                     box = (left, top, left + side, top + side)
                     scale = size / side
+                    others = [identity for identity in people if identity != annotation.instance_id]
+                    if isolated and not _isolated(box, points, instances, others):
+                        crowded += 1
+                        continue
                     stem = f"{scene.job_id}-f{frame.index:06d}-i{annotation.instance_id:03d}"
                     folder = staging / scene.job_id
                     folder.mkdir(exist_ok=True)
@@ -260,6 +288,7 @@ def export_crops(
                 "margin": margin,
                 "min_height": min_height,
                 "dilate_px": dilate,
+                "isolated": isolated,
                 "pose_format": "openpose-18",
                 "keypoint_names": list(OPENPOSE_18),
                 "note": "Generated images may only change pixels inside inpaint.png; "
@@ -267,4 +296,4 @@ def export_crops(
                 "crops": items,
             },
         )
-    return CropResult(destination, len(items), skipped)
+    return CropResult(destination, len(items), skipped, crowded)

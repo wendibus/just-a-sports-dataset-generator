@@ -69,6 +69,11 @@ def _parser() -> argparse.ArgumentParser:
     crops.add_argument("--margin", type=float, default=0.25)
     crops.add_argument("--min-height", type=int, default=24)
     crops.add_argument("--dilate", type=int, default=9)
+    crops.add_argument(
+        "--isolated",
+        action="store_true",
+        help="only people fully in frame, every body joint visible and nobody else close by",
+    )
     composite = subcommands.add_parser(
         "composite-crops", help="paste generated person crops back into a copy of a render"
     )
@@ -116,6 +121,12 @@ def _parser() -> argparse.ArgumentParser:
             "--pose-image",
             action="store_true",
             help="also give Qwen the OpenPose skeleton (more tokens, roughly 2x slower)",
+        )
+        command.add_argument(
+            "--time-limit",
+            type=float,
+            metavar="MINUTES",
+            help="start no new person after this many minutes; rerun to continue",
         )
         command.add_argument("--yes", action="store_true", help="approve a needed download")
     preview = subcommands.add_parser(
@@ -165,6 +176,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             quant=args.quant,
             resolution=args.resolution,
             pose_image=args.pose_image,
+            time_limit=args.time_limit,
             progress=report,
         )
         print(f"{made.generated} von {made.total} Personen generiert in {args.output}")
@@ -187,6 +199,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             quant=args.quant,
             resolution=args.resolution,
             pose_image=args.pose_image,
+            time_limit=args.time_limit,
             progress=report,
         )
         merged = composite_crops(
@@ -221,11 +234,23 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
         return 0
     if args.command == "export-crops":
         result = export_crops(
-            args.source, args.output, args.size, args.margin, args.min_height, args.dilate
+            args.source,
+            args.output,
+            args.size,
+            args.margin,
+            args.min_height,
+            args.dilate,
+            isolated=args.isolated,
         )
         print(
             f"wrote {result.crops} person crops to {args.output} "
-            f"({result.skipped_small} smaller than {args.min_height} px skipped)"
+            f"({result.skipped_small} smaller than {args.min_height} px skipped"
+            + (
+                f", {result.skipped_not_isolated} not fully visible or not alone"
+                if args.isolated
+                else ""
+            )
+            + ")"
         )
         return 0
     if args.command == "export":

@@ -119,6 +119,22 @@ out-of-memory error, frees it, retries once at the same size and then at about 8
 side length per try (down to 256 px). The resolution actually used is recorded per crop in
 `generation.jsonl`, and the progress line shows the seconds per person.
 
+## Overnight batch
+
+`scripts/qwen-nacht.sh [OUTPUT] [HOURS] [SCENES]` (defaults `../qwen-nacht`, 9, 60) renders
+broadcast scenes, exports 512 px crops with `export-crops --isolated` and runs
+`generate-crops --resolution 512 --time-limit` with whatever time is left; at the end
+`OUTPUT/index.html` shows each rendered person next to its result with the seconds per
+person. It keeps the Mac awake with `caffeinate`, restarts Qwen after a crash and resumes
+every step when started again.
+
+`--isolated` keeps only people whose whole crop box lies inside the frame, whose 14 body
+joints are all visible (`v = 2`) and whose crop box shows at most 3 % other players or
+referees. On broadcast renders that leaves about 2–4 people per scene. Bench players and
+spectators are background in the ID pass and are not counted; the worker blurs them.
+`generate-crops` alternates pose families, so a run stopped by `--time-limit` still covers
+every pose; the limit is not a setting, so the same folder continues with a new budget.
+
 ## Using another tool
 
 Feed each crop to a local inpainting workflow: `rgb.png` as the image, `inpaint.png` as
