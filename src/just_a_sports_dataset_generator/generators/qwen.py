@@ -165,8 +165,9 @@ def generate_crops(
 def _message(line: str) -> str:
     kind, _, rest = line.partition(" ")
     if kind == "QWEN_CROP":
-        count, _, crop = rest.partition(" ")
-        return f"Person {count} fertig ({crop})"
+        count, crop, *seconds = rest.split(" ")
+        took = f", {seconds[0]} s" if seconds else ""
+        return f"Person {count} fertig ({crop}{took})"
     if kind == "QWEN_READY":
         return f"Modell geladen ({rest})"
     if kind == "QWEN_TODO":

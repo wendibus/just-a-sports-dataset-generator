@@ -7,6 +7,8 @@ the output folder. Existing results are skipped, so an interrupted run resumes. 
 validates and composites the results; this worker never touches labels.
 """
 
+import contextlib
+import gc
 import hashlib
 import json
 import math
@@ -102,6 +104,29 @@ def pick_device(torch, requested):
     return "cpu"
 
 
+def release_memory(torch):
+    """Return cached accelerator memory after each crop.
+
+    PyTorch keeps freed MPS/CUDA blocks in its own pool. Over several crops that pool grew
+    until a Mac run failed with "MPS backend out of memory" on the third person.
+    """
+    gc.collect()
+    for backend in ("mps", "cuda"):
+        module = getattr(torch, backend, None)
+        if module is not None and hasattr(module, "empty_cache"):
+            with contextlib.suppress(Exception):  # backend present but not initialised
+                module.empty_cache()
+
+
+def is_out_of_memory(exc):
+    return isinstance(exc, (RuntimeError, MemoryError)) and "out of memory" in str(exc).lower()
+
+
+def smaller(work):
+    """Next work resolution after an out-of-memory error (about 30 % fewer pixels)."""
+    return max(256, int(work * 0.84) // 16 * 16)
+
+
 def load_pipeline(torch, request, log):
     from diffusers import (
         FlowMatchEulerDiscreteScheduler,
@@ -174,19 +199,35 @@ def main():
             images = [rgb.convert("RGB"), pose.convert("RGB")]
         prompt = request.get("prompt") or build_prompt(crop)
         seed = crop_seed(request["seed"], crop["id"])
-        result = pipe(
-            image=images,
-            prompt=prompt,
-            # Only used with classifier-free guidance (the 30-step fallback); the 4-step
-            # Lightning schedule runs without it (true_cfg_scale 1).
-            negative_prompt=NEGATIVE_PROMPT if cfg > 1 else " ",
-            true_cfg_scale=cfg,
-            guidance_scale=1.0,
-            num_inference_steps=steps,
-            height=work,
-            width=work,
-            generator=torch.Generator(device="cpu").manual_seed(seed),
-        ).images[0]
+        # On "out of memory": free the cache and retry at the same size, then smaller.
+        attempt_work, attempts = work, 0
+        while True:
+            try:
+                result = pipe(
+                    image=images,
+                    prompt=prompt,
+                    # Only used with classifier-free guidance (the 30-step fallback); the
+                    # 4-step Lightning schedule runs without it (true_cfg_scale 1).
+                    negative_prompt=NEGATIVE_PROMPT if cfg > 1 else " ",
+                    true_cfg_scale=cfg,
+                    guidance_scale=1.0,
+                    num_inference_steps=steps,
+                    height=attempt_work,
+                    width=attempt_work,
+                    generator=torch.Generator(device="cpu").manual_seed(seed),
+                ).images[0]
+                break
+            except Exception as exc:
+                attempts += 1
+                if not is_out_of_memory(exc) or attempts > 3 or attempt_work == 256:
+                    raise
+                release_memory(torch)
+                if attempts > 1:
+                    attempt_work = smaller(attempt_work)
+                log(
+                    f"QWEN_WARNING Speicher voll bei {crop['id']}, neuer Versuch mit "
+                    f"{attempt_work} px (andere GPU-Programme beenden hilft)"
+                )
         if result.size != (size, size):
             result = result.resize((size, size), Image.Resampling.LANCZOS)
         partial = output / f".{crop['id']}.partial.png"
@@ -201,13 +242,17 @@ def main():
                         "steps": steps,
                         "true_cfg_scale": cfg,
                         "lightning": lightning,
+                        "resolution": attempt_work,
                         "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
                         "seconds": round(time.monotonic() - began, 1),
                     }
                 )
                 + "\n"
             )
-        log(f"QWEN_CROP {number}/{len(todo)} {crop['id']}")
+        seconds = time.monotonic() - began
+        del result, images
+        release_memory(torch)
+        log(f"QWEN_CROP {number}/{len(todo)} {crop['id']} {seconds:.0f}")
 
 
 if __name__ == "__main__":

@@ -81,6 +81,9 @@ class QwenImageEditPlusPipeline:
                  generator, **kwargs):
         if os.environ.get("FAKE_QWEN_CRASH_AFTER") and len(open(os.environ["FAKE_QWEN_LOG"]).read().split("call")) > int(os.environ["FAKE_QWEN_CRASH_AFTER"]):
             raise SystemExit(7)
+        if width > int(os.environ.get("FAKE_QWEN_OOM_ABOVE", "100000")):
+            _log({"oom": width})
+            raise RuntimeError("MPS backend out of memory (fake)")
         _log({"call": len(image), "steps": num_inference_steps, "cfg": true_cfg_scale,
               "size": [width, height], "seed": generator.seed, "referee": "referee" in prompt})
         out = image[0].resize((width, height))
@@ -263,6 +266,25 @@ class QwenGenerateTests(unittest.TestCase):
             self.assertEqual(image.size, (1024, 1024))
         with self.assertRaises(ValueError):
             generate_crops(self.root / "big-crops", self.root / "x", confirm=never, resolution=64)
+
+    def test_out_of_memory_frees_the_cache_and_retries_smaller(self):
+        export_crops(self.source, self.root / "big-crops", size=1024)
+        messages: list[str] = []
+        with patch.dict(os.environ, {"FAKE_QWEN_OOM_ABOVE": "700"}):
+            result = generate_crops(
+                self.root / "big-crops",
+                self.root / "big-gen",
+                confirm=never,
+                progress=messages.append,
+            )
+        self.assertEqual(result.generated, 2)
+        # 768 fails twice (second try after freeing the cache), then 640 fits.
+        self.assertEqual([e["oom"] for e in self.entries() if "oom" in e], [768, 768] * 2)
+        self.assertEqual({tuple(c["size"]) for c in self.calls()}, {(640, 640)})
+        records = (self.root / "big-gen/generation.jsonl").read_text().splitlines()
+        self.assertEqual({json.loads(r)["resolution"] for r in records}, {640})
+        self.assertTrue(any("Speicher voll" in m for m in messages))
+        self.assertTrue(any(m.startswith("Person 1/2 fertig") and " s)" in m for m in messages))
 
 
 if __name__ == "__main__":

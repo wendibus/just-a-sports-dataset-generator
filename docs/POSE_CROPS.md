@@ -97,6 +97,13 @@ Trainer training ran in parallel). The manual mflux test of the same model peake
 39 GB, so do not run Qwen next to another GPU-heavy job: both slow down and the other job
 can run out of memory.
 
+**Memory.** The first Mac run of prompt v2 (M4 Pro, Reco training in parallel) finished two
+crops and then failed with "MPS backend out of memory": PyTorch kept the freed blocks of
+earlier crops in its pool. The worker now returns that cache after every crop and, on an
+out-of-memory error, frees it, retries once at the same size and then at about 84 % of the
+side length per try (down to 256 px). The resolution actually used is recorded per crop in
+`generation.jsonl`, and the progress line shows the seconds per person.
+
 ## Using another tool
 
 Feed each crop to a local inpainting workflow: `rgb.png` as the image, `inpaint.png` as
