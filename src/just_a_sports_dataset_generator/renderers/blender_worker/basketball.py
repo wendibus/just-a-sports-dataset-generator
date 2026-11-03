@@ -786,7 +786,7 @@ def athlete(plan):
     elif referee and referee.get("accent"):
         for side in (-1, 1):  # accent piping down the shirt's sides
             piping = [(side * 0.215, 0, 0.98 - drop), (side * 0.26, 0, 1.42 - drop)]
-            line("Referee piping", piping, stripe_mat, 0.012, identity, upper)
+            line("Referee piping", piping, stripe_mat, 0.02, identity, upper)
     RIGS[identity] = (upper, drop, updaters)
     SKELETONS[identity] = (root, {name: j[name] for name in OPENPOSE_18})
     return root
@@ -875,11 +875,12 @@ def ball(design=None):
     bpy.context.collection.objects.link(root)
     sphere = oval("Basketball", (0, 0, 0), (0.12,) * 3, base, 1, root)
     if design.get("panels"):
-        # Two-tone: alternate octants between the three seam circles get the panel colour.
+        # Two-tone: the panel colour covers the polar half of alternate octants, about a
+        # quarter of the surface, close to the share of real two-tone balls.
         sphere.data.materials.append(leather("Basketball panels", tuple(design["panels"])))
         for poly in sphere.data.polygons:
-            c = poly.center
-            poly.material_index = 1 if c.x * c.y * c.z > 0 else 0
+            c = poly.center  # unit sphere before the object scale
+            poly.material_index = 1 if c.x * c.y * c.z > 0 and abs(c.z) > 0.45 else 0
     seam = material("Ball seams", tuple(design.get("seams") or (0.014, 0.010, 0.008)), 0.9)
     for axis in range(3):
         points = []

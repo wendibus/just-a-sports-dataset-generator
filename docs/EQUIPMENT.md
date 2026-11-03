@@ -73,9 +73,10 @@ regulation range.
 | Football | white base with colour graphics in ten palettes (blue/gold stars, red/green/blue, pink/orange, purple/magenta, cyan/blue/pink, pink/black, blue/yellow/green, red/blue/black, yellow/black) and one yellow high-visibility ball, 1 each |
 | Futsal | white base with neon or saturated graphics: blue/neon (2), black/neon (2), red/blue (2), purple/yellow, red/orange, purple/neon, blue (1 each) |
 
-Basketball two-tone balls are rendered with the panel colour on alternate octants between
-the three seam circles: a simplification of the 12-panel layout that keeps colour shares and
-contrast.
+Basketball two-tone balls get the panel colour on the polar half of alternate octants
+between the three seam circles, about a quarter of the surface: a simplification of the
+12-panel layout that keeps the colour share and contrast. (A first test render with whole
+octants looked half white.)
 
 ## Referee kits
 
