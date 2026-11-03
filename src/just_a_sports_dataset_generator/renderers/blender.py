@@ -103,7 +103,7 @@ class BlenderBasketballRenderer:
             raise ValueError("max_frames must be positive")
         count = min(job.frame_count, max_frames) if max_frames is not None else job.frame_count
         destination = output_directory / job.job_id
-        layout = plan_scene(job.seed, count)
+        layout = plan_scene(job.seed, count, job.equipment_profile)
         with new_directory(destination) as staging:
             # The renderer-independent plan is kept with the scene for inspection and replay.
             write_json(staging / "layout.json", layout)

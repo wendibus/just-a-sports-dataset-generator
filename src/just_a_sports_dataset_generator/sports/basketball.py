@@ -399,7 +399,9 @@ def _situation(
     return offense, defense, 0.3
 
 
-def plan_scene(seed: int, frames: int) -> dict[str, object]:
+def plan_scene(
+    seed: int, frames: int, equipment_profile: str = "international"
+) -> dict[str, object]:
     """Plan one basketball scene. Same seed and frame count, same layout."""
     rng = random.Random(f"basketball-layout:v1.1:{seed}")
     situation = rng.choices(SITUATIONS, SITUATION_WEIGHTS)[0]
@@ -512,8 +514,10 @@ def plan_scene(seed: int, frames: int) -> dict[str, object]:
     xs = [r[0].x for r in roots.values()]
     # A separate random stream: adding equipment must not change any earlier layout choice.
     equipment_rng = random.Random(f"basketball-equipment:v1:{seed}")
-    ball_design = choose_ball(equipment_rng, "basketball").render_spec()
-    referee_kit = choose_referee_kit(equipment_rng, "basketball", kits).render_spec()
+    ball_design = choose_ball(equipment_rng, "basketball", equipment_profile).render_spec()
+    referee_kit = choose_referee_kit(
+        equipment_rng, "basketball", kits, profile=equipment_profile
+    ).render_spec()
     for athlete in athletes:
         if athlete["team"] == 2:
             athlete["kit"] = referee_kit["shirt"]
@@ -529,7 +533,11 @@ def plan_scene(seed: int, frames: int) -> dict[str, object]:
         "benches": _benches(rng, kits),
         "athletes": athletes,
         "ball": ball,
-        "equipment": {"ball": ball_design, "referee_kit": referee_kit},
+        "equipment": {
+            "profile": equipment_profile,
+            "ball": ball_design,
+            "referee_kit": referee_kit,
+        },
     }
 
 
@@ -805,8 +813,9 @@ def _hall(rng: random.Random) -> dict[str, object]:
         "light_energy": round(u(1100, 2600), 1),
         "light_kelvin": round(u(3800, 6500), 0),
         "light_rows": rng.choice((2, 3)),
-        "spectator_density": (
-            round(rng.choice((0.0, u(0.05, 0.3), u(0.3, 0.8))), 3) if style == "arena" else 0.0
-        ),
+        # No spectators in synthetic material (project owner's decision): the draw is kept
+        # so every later choice of an existing seed stays the same, but stands stay empty.
+        "spectator_density": 0.0
+        * (round(rng.choice((0.0, u(0.05, 0.3), u(0.3, 0.8))), 3) if style == "arena" else 0.0),
         "spectator_seed": rng.randrange(2**31),
     }

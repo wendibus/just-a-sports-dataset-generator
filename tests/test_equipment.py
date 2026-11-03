@@ -6,11 +6,13 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
+from just_a_sports_dataset_generator.scenario.planner import RecipeError, load_recipe
 from just_a_sports_dataset_generator.sports import equipment
 from just_a_sports_dataset_generator.sports.basketball import plan_scene
 from just_a_sports_dataset_generator.sports.equipment import (
     EquipmentError,
     catalogue,
+    choose_ball,
     choose_referee_kit,
     linear,
     parse,
@@ -81,6 +83,52 @@ class EquipmentTests(unittest.TestCase):
             self.assertEqual(referee["kit"], gear["referee_kit"]["shirt"])
         seen = {plan_scene(seed, 1)["equipment"]["ball"]["design"] for seed in range(60)}
         self.assertEqual(seen, ids)  # every design appears
+
+    def test_germany_profile_reweights_the_same_looks(self):
+        rng = random.Random(3)
+        balls = [choose_ball(rng, "basketball", "germany").id for _ in range(400)]
+        self.assertGreater(balls.count("orange_ivory"), 250)  # the common DBB ball look
+        kits = {choose_referee_kit(rng, "basketball", [], profile="germany").id for _ in range(400)}
+        self.assertNotIn("black_white_stripes", kits)  # weight 0 in this profile
+        with self.assertRaises(ValueError):
+            choose_ball(rng, "basketball", "mars")
+        bad = json.loads(DATA.read_text())
+        bad["sports"]["futsal"]["profiles"]["germany"]["balls"] = {"no_such_ball": 1}
+        with self.assertRaises(EquipmentError):
+            parse(bad)
+
+    def test_recipe_1_2_selects_the_profile(self):
+        import tempfile
+
+        base = {
+            "name": "x",
+            "sport": "basketball",
+            "seed": 1,
+            "scenes": 1,
+            "frames_per_scene": 1,
+            "resolution": {"width": 64, "height": 48},
+            "annotations": ["bounding_boxes"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "r.json"
+            path.write_text(
+                json.dumps({**base, "schema_version": "1.2", "equipment_profile": "germany"})
+            )
+            self.assertEqual(load_recipe(path).equipment_profile, "germany")
+            path.write_text(json.dumps({**base, "schema_version": "1.2"}))
+            self.assertEqual(load_recipe(path).equipment_profile, "international")
+            for version, profile in (("1.2", "mars"), ("1.1", "germany")):
+                path.write_text(
+                    json.dumps({**base, "schema_version": version, "equipment_profile": profile})
+                )
+                with self.subTest(version=version), self.assertRaises(RecipeError):
+                    load_recipe(path)
+        layout = plan_scene(5, 1, "germany")
+        self.assertEqual(layout["equipment"]["profile"], "germany")
+
+    def test_synthetic_halls_have_no_spectators(self):
+        for seed in range(40):
+            self.assertEqual(plan_scene(seed, 1)["hall"]["spectator_density"], 0.0)
 
 
 if __name__ == "__main__":

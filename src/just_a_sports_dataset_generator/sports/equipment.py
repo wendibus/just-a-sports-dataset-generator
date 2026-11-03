@@ -17,7 +17,10 @@ from functools import cache
 from importlib import resources
 from typing import cast
 
+from just_a_sports_dataset_generator.core import EQUIPMENT_PROFILES
+
 SPORTS = ("basketball", "football", "futsal")
+PROFILES = EQUIPMENT_PROFILES
 HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 RGB = tuple[float, float, float]
 
@@ -94,6 +97,11 @@ class SportEquipment:
     regulation: BallRegulation
     balls: tuple[BallDesign, ...]
     referee_kits: tuple[RefereeKit, ...]
+    profiles: dict[str, dict[str, dict[str, float]]]
+    """Weight overrides: profile -> "balls"/"referee_kits" -> id -> weight."""
+
+    def weight(self, profile: str, group: str, identity: str, default: float) -> float:
+        return self.profiles.get(profile, {}).get(group, {}).get(identity, default)
 
 
 PATTERNS = frozenset({"plain", "vertical_stripes", "chest_pockets"})
@@ -201,11 +209,40 @@ def _kit(raw: dict[str, object], where: str) -> RefereeKit:
     )
 
 
+def _profiles(
+    value: object, sport: str, balls: list[BallDesign], kits: list[RefereeKit]
+) -> dict[str, dict[str, dict[str, float]]]:
+    known = {"balls": {b.id for b in balls}, "referee_kits": {k.id for k in kits}}
+    defaults = {
+        "balls": {b.id: b.weight for b in balls},
+        "referee_kits": {k.id: k.weight for k in kits},
+    }
+    result: dict[str, dict[str, dict[str, float]]] = {}
+    for profile, raw in _object(value, f"{sport} profiles").items():
+        where = f"{sport} profile {profile}"
+        if profile not in PROFILES or profile == "international":
+            raise EquipmentError(f"{where}: unknown profile")
+        groups: dict[str, dict[str, float]] = {}
+        for group, weights in _object(raw, where).items():
+            if group not in known:
+                raise EquipmentError(f"{where}: unknown group {group}")
+            parsed = {key: _number(v, where) for key, v in _object(weights, where).items()}
+            if set(parsed) - known[group] or any(v < 0 for v in parsed.values()):
+                raise EquipmentError(f"{where}: unknown id or negative weight in {group}")
+            if not any(parsed.get(key, w) > 0 for key, w in defaults[group].items()):
+                raise EquipmentError(f"{where}: every {group} weight is zero")
+            groups[group] = parsed
+        result[profile] = groups
+    return result
+
+
 def parse(data: object) -> dict[str, SportEquipment]:
     """Validate the catalogue; raises EquipmentError with the offending entry."""
     root = _object(data, "equipment")
     if root.get("schema_version") != "1.0":
         raise EquipmentError("unsupported equipment schema version")
+    if root.get("default_profile") != "international":
+        raise EquipmentError("default_profile must be international")
     sports = _object(root.get("sports"), "sports")
     if set(sports) != set(SPORTS):
         raise EquipmentError(f"equipment must describe exactly {', '.join(SPORTS)}")
@@ -236,7 +273,8 @@ def parse(data: object) -> dict[str, SportEquipment]:
         for names in ([b.id for b in balls], [k.id for k in kits]):
             if len(names) != len(set(names)):
                 raise EquipmentError(f"{sport}: duplicate ids")
-        result[sport] = SportEquipment(sport, regulation, tuple(balls), tuple(kits))
+        profiles = _profiles(entry.get("profiles", {}), sport, balls, kits)
+        result[sport] = SportEquipment(sport, regulation, tuple(balls), tuple(kits), profiles)
     return result
 
 
@@ -250,22 +288,41 @@ def _distance(a: RGB, b: RGB) -> float:
     return sum((x - y) ** 2 for x, y in zip(a, b, strict=True)) ** 0.5
 
 
-def choose_ball(rng: random.Random, sport: str) -> BallDesign:
-    designs = catalogue()[sport].balls
-    return rng.choices(designs, [d.weight for d in designs])[0]
+def _check_profile(profile: str) -> None:
+    if profile not in PROFILES:
+        raise ValueError(f"equipment profile must be one of: {', '.join(PROFILES)}")
+
+
+def choose_ball(rng: random.Random, sport: str, profile: str = "international") -> BallDesign:
+    _check_profile(profile)
+    entry = catalogue()[sport]
+    weights = [entry.weight(profile, "balls", d.id, d.weight) for d in entry.balls]
+    return rng.choices(entry.balls, weights)[0]
 
 
 def choose_referee_kit(
-    rng: random.Random, sport: str, team_kits: list[RGB], min_distance: float = 0.25
+    rng: random.Random,
+    sport: str,
+    team_kits: list[RGB],
+    min_distance: float = 0.25,
+    profile: str = "international",
 ) -> RefereeKit:
     """Weighted pick among kits whose shirt differs from every team kit (linear RGB).
 
     The laws of all three sports require referee colours that differ from both teams.
+    Kits with weight 0 in the profile are never used; if no kit qualifies, the contrast
+    rule is relaxed before the profile.
     """
-    kits = catalogue()[sport].referee_kits
+    _check_profile(profile)
+    entry = catalogue()[sport]
+
+    def weight(kit: RefereeKit) -> float:
+        return entry.weight(profile, "referee_kits", kit.id, kit.weight)
+
+    usable = [kit for kit in entry.referee_kits if weight(kit) > 0]
     allowed = [
         kit
-        for kit in kits
+        for kit in usable
         if all(_distance(linear(kit.shirt), team) >= min_distance for team in team_kits)
-    ] or list(kits)
-    return rng.choices(allowed, [kit.weight for kit in allowed])[0]
+    ] or usable
+    return rng.choices(allowed, [weight(kit) for kit in allowed])[0]

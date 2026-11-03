@@ -328,7 +328,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             write_json(
                 staging / "run.json",
                 {
-                    "schema_version": "1.1",
+                    "schema_version": "1.2",
                     "application_version": __version__,
                     "recipe": asdict(recipe),
                     "recipe_sha256": sha256_file(args.recipe),

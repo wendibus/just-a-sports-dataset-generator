@@ -30,6 +30,30 @@ futsal, and official match balls for all three sports. The sheets describe thems
 - **Weights** are the number of datasheet columns that show a look. They describe what
   the sheets show, not a measured share of real matches.
 
+## Profiles
+
+The material is meant to work internationally, so the default profile `international`
+samples with the datasheet weights. The profile `germany` reweights the same looks for
+German leagues and amateur play; select it with `"equipment_profile": "germany"` in a
+recipe with schema 1.2.
+
+| Sport | `germany` differs from `international` |
+| --- | --- |
+| Basketball | ball mostly orange/ivory (8 of 10.5), referee grey with black sleeves (9) or black with neon (1); no orange or striped kits |
+| Football | ball mostly the pink/orange design (4); referee black (4), fluorescent yellow, fluorescent blue or red (1 each) |
+| Futsal | ball mostly black/neon (4); referee black (4), grey or yellow (1 each) |
+
+Weights of 0 switch a look off for the profile. Profiles never add looks, they only
+reweight the catalogue.
+
+## Decisions from the project owner (November 2026)
+
+- Both profiles are kept; the material must work internationally.
+- Basketball referees always wear **long black trousers**: it is the most important
+  feature for recognising a referee. There is no shorts variant for basketball.
+- People outside the court (bench, table officials, coaches) are excluded by the court
+  boundary, in labels and in real footage. Synthetic material contains **no spectators**.
+
 ## Regulation balls
 
 | Sport | Size | Circumference | Mass | Pressure | Bounce | Source |
