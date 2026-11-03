@@ -78,17 +78,25 @@ class QwenImageEditPlusPipeline:
     def set_progress_bar_config(self, **kwargs):
         pass
     def __call__(self, image, prompt, num_inference_steps, true_cfg_scale, height, width,
-                 generator, **kwargs):
+                 generator, mask_image=None, strength=None, **kwargs):
+        assert (mask_image is not None) == self.inpaint, "mask only in inpaint mode"
+        images = image if isinstance(image, list) else [image]
         if os.environ.get("FAKE_QWEN_CRASH_AFTER") and len(open(os.environ["FAKE_QWEN_LOG"]).read().split("call")) > int(os.environ["FAKE_QWEN_CRASH_AFTER"]):
             raise SystemExit(7)
         if width > int(os.environ.get("FAKE_QWEN_OOM_ABOVE", "100000")):
             _log({"oom": width})
             raise RuntimeError("MPS backend out of memory (fake)")
-        _log({"call": len(image), "steps": num_inference_steps, "cfg": true_cfg_scale,
-              "size": [width, height], "seed": generator.seed, "referee": "referee" in prompt})
-        out = image[0].resize((width, height))
+        _log({"call": len(images), "steps": num_inference_steps, "cfg": true_cfg_scale,
+              "size": [width, height], "seed": generator.seed, "referee": "referee" in prompt,
+              "inpaint": self.inpaint, "strength": strength})
+        out = images[0].resize((width, height))
         ImageDraw.Draw(out).rectangle((width // 3, height // 4, 2 * width // 3, 3 * height // 4), fill=(200, 30, 30))
         return SimpleNamespace(images=[out])
+
+QwenImageEditPlusPipeline.inpaint = False
+
+class QwenImageEditInpaintPipeline(QwenImageEditPlusPipeline):
+    inpaint = True
 """
 
 
@@ -169,9 +177,11 @@ class QwenGenerateTests(unittest.TestCase):
         self.assertIn({"scheduler": "exponential"}, entries)
         self.assertIn({"device": "cpu"}, entries)
         calls = self.calls()
-        self.assertEqual([c["steps"] for c in calls], [4, 4])
+        # Inpainting at strength 0.8 skips 20 % of a 5-step schedule: 4 real steps.
+        self.assertEqual([c["steps"] for c in calls], [5, 5])
+        self.assertEqual({(c["inpaint"], c["strength"]) for c in calls}, {(True, 0.8)})
         self.assertEqual([c["cfg"] for c in calls], [1.0, 1.0])
-        self.assertEqual(calls[0]["call"], 1)  # RGB crop only; the skeleton is opt-in
+        self.assertEqual(calls[0]["call"], 1)  # the RGB crop (plus the mask)
         self.assertEqual(calls[0]["size"], [256, 256])  # at least 256, multiple of 16
         with Image.open(self.root / "gen/scene-000000-f000000-i010.png") as image:
             self.assertEqual(image.size, (100, 100))  # back at crop size
@@ -207,7 +217,7 @@ class QwenGenerateTests(unittest.TestCase):
             generate_crops(
                 self.root / "crops", self.root / "gen", confirm=never, progress=messages.append
             )
-        self.assertEqual({c["steps"] for c in self.calls()}, {30})
+        self.assertEqual({c["steps"] for c in self.calls()}, {38})  # ceil(30 / 0.8)
         self.assertEqual({c["cfg"] for c in self.calls()}, {4.0})
         self.assertTrue(any("Lightning LoRA not usable" in m for m in messages))
 
@@ -290,10 +300,12 @@ class QwenGenerateTests(unittest.TestCase):
             self.root / "crops",
             self.root / "gen",
             confirm=never,
+            mode="edit",
             pose_image=True,
             progress=lambda _: None,
         )
         self.assertEqual({c["call"] for c in self.calls()}, {2})
+        self.assertEqual({(c["inpaint"], c["steps"]) for c in self.calls()}, {(False, 4)})
         self.assertTrue(read_json(self.root / "gen/generation.json")["settings"]["pose_image"])
 
     def test_out_of_memory_frees_the_cache_and_retries_smaller(self):

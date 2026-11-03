@@ -123,6 +123,19 @@ def _parser() -> argparse.ArgumentParser:
             help="also give Qwen the OpenPose skeleton (more tokens, roughly 2x slower)",
         )
         command.add_argument(
+            "--mode",
+            choices=("inpaint", "edit"),
+            default="inpaint",
+            help="inpaint: repaint only inside the person's mask, starting from the render "
+            "(keeps outline and camera); edit: let Qwen redraw the whole crop",
+        )
+        command.add_argument(
+            "--strength",
+            type=float,
+            default=0.8,
+            help="inpaint only: how far from the render Qwen may move (0.1-1.0, default 0.8)",
+        )
+        command.add_argument(
             "--time-limit",
             type=float,
             metavar="MINUTES",
@@ -177,6 +190,8 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             resolution=args.resolution,
             pose_image=args.pose_image,
             time_limit=args.time_limit,
+            mode=args.mode,
+            strength=args.strength,
             progress=report,
         )
         print(f"{made.generated} von {made.total} Personen generiert in {args.output}")
@@ -200,6 +215,8 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             resolution=args.resolution,
             pose_image=args.pose_image,
             time_limit=args.time_limit,
+            mode=args.mode,
+            strength=args.strength,
             progress=report,
         )
         merged = composite_crops(

@@ -119,6 +119,26 @@ out-of-memory error, frees it, retries once at the same size and then at about 8
 side length per try (down to 256 px). The resolution actually used is recorded per crop in
 `generation.jsonl`, and the progress line shows the seconds per person.
 
+## Inpaint mode (default since prompt version 4)
+
+The overnight run of prompt v3 (118 isolated people, 512 px, 63 s each on an M4 Pro)
+produced photorealistic people, but in `edit` mode Qwen redraws the whole crop as a new
+photo: eye-level camera, a larger, centred person, a new hall. Pasted back with the instance
+mask, the figures fell apart; the spill check would have rejected 117 of 118 (median
+background change 0.24).
+
+`--mode inpaint` (default) uses diffusers' `QwenImageEditInpaintPipeline` with the same
+installed model: generation starts from the render, only pixels inside `inpaint.png` may
+change, and `--strength` (default 0.8) sets how far the result may move away from the render.
+Outline, size, camera angle and kit colours therefore come from Blender. The schedule is
+stretched so that the requested 4 Lightning steps are actually run (5 scheduled steps at
+strength 0.8). The prompt describes only the person and forbids lettering except the number.
+`--mode edit` keeps the previous behaviour.
+
+`scripts/qwen_inpaint_vergleich.py RUN` repaints 12 crops of an earlier run at strengths
+0.6, 0.75 and 0.9 and writes `RUN/vergleich/vergleich.jpg` with every result pasted back with
+the instance mask.
+
 ## Overnight batch
 
 `scripts/qwen-nacht.sh [OUTPUT] [HOURS] [SCENES]` (defaults `../qwen-nacht`, 9, 60) renders

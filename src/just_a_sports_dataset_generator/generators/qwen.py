@@ -30,7 +30,7 @@ from .qwen_setup import (
 )
 
 WORKER = Path(__file__).with_name("qwen_worker.py")
-PROMPT_VERSION = 3
+PROMPT_VERSION = 4
 """Must match qwen_worker.PROMPT_VERSION; part of a run's fingerprint so runs never mix."""
 
 
@@ -74,6 +74,8 @@ def generate_crops(
     quant: str = "Q4_K_M",
     resolution: int = 768,
     pose_image: bool = False,
+    mode: str = "inpaint",
+    strength: float = 0.8,
     time_limit: float | None = None,
     home: Path | None = None,
     progress: Callable[[str], None] = print,
@@ -84,6 +86,10 @@ def generate_crops(
         raise ValueError("seed must be a non-negative integer")
     if type(resolution) is not int or not 256 <= resolution <= 2048:
         raise ValueError("resolution must be an integer between 256 and 2048")
+    if mode not in ("inpaint", "edit"):
+        raise ValueError("mode must be inpaint or edit")
+    if not 0.1 <= strength <= 1.0:
+        raise ValueError("strength must be between 0.1 and 1.0")
     if time_limit is not None and not time_limit > 0:
         raise ValueError("time_limit must be a positive number of minutes")
     if device not in ("auto", "mps", "cuda", "cpu"):
@@ -103,6 +109,8 @@ def generate_crops(
         "quant": quant,
         "resolution": resolution,
         "pose_image": pose_image,
+        "mode": mode,
+        "strength": strength if mode == "inpaint" else None,
     }
     if output.exists():
         try:
@@ -113,7 +121,7 @@ def generate_crops(
             raise FileExistsError(f"{output} belongs to different crops or settings")
         progress("Vorhandener Lauf wird fortgesetzt …")
     manifest = ensure_installed(confirm, quant, home, progress)
-    generator = f"Qwen-Image-Edit-2511 {manifest.get('quant')} + Lightning LoRA (local)"
+    generator = f"Qwen-Image-Edit-2511 {manifest.get('quant')} + Lightning LoRA, {mode} (local)"
     if not output.exists():
         output.mkdir(parents=True)
         write_json(
@@ -141,6 +149,8 @@ def generate_crops(
             "prompt": prompt,
             "resolution": resolution,
             "pose_image": pose_image,
+            "mode": mode,
+            "strength": strength,
             # Not part of the settings: a resumed run may get a different budget.
             "deadline": time.time() + time_limit * 60 if time_limit else None,
         },

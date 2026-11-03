@@ -17,10 +17,12 @@ import sys
 import time
 from pathlib import Path
 
-PROMPT_VERSION = 3
+PROMPT_VERSION = 4
 """2: tank-top jersey description, pose hint per pose family, colours taken from image 1.
 3: no "shoulder panels" (Qwen drew pads and wings), real-photo wording against the 3D look,
-   pose skeleton optional, background outside the person blurred before generation."""
+   pose skeleton optional, background outside the person blurred before generation.
+4: inpaint mode (default): repaint only inside the person's mask, starting from the render;
+   no lettering except the number (night run: invented team names, colours changed)."""
 JERSEY = (
     "a thin, loose sleeveless basketball jersey of lightweight fabric with simple round "
     "armholes, a scoop neckline and the number printed on the chest, and loose knee-length "
@@ -68,8 +70,8 @@ def build_prompt(crop, pose_image=False):
         f"{'referee' if referee else 'player'} in an indoor sports hall. {pose}"
         f"Keep exactly the body pose of image 1{skeleton}: the same knee bend, arm positions, "
         "body lean, position, size and outline, and the same camera angle. "
-        f"The {'referee' if referee else 'player'} {kit}. Only one person, the background "
-        "stays out of focus. A real photograph of a real athlete, not a 3D render, not a doll "
+        f"The {'referee' if referee else 'player'} {kit}. No lettering or logos except the "
+        "number. Only one person, the background stays out of focus. A real photograph of a real athlete, not a 3D render, not a doll "
         "or action figure: natural skin texture and hair, anatomically correct hands, matte "
         "fabric with natural folds, sharp sports photography."
     )
@@ -158,6 +160,41 @@ def set_condition_size(work):
         module.VAE_IMAGE_SIZE = work * work
 
 
+def inpaint_prompt(crop):
+    """Prompt for inpaint mode: the render already fixes pose, outline, camera and colours."""
+    referee = crop.get("label") == "referee"
+    who = "basketball referee" if referee else "basketball player"
+    kit = (
+        REFEREE_KIT
+        if referee
+        else "a sleeveless basketball jersey and shorts in exactly the colours of the figure, "
+        "with the same number and no other lettering or logos"
+    )
+    hint = POSE_HINTS.get(crop.get("pose_family") or "")
+    pose = f", {hint}" if hint else ""
+    return (
+        f"Turn the 3D figure into a photorealistic {who}{pose}. Keep exactly its pose, outline, "
+        f"size, position and the camera angle. The {'referee' if referee else 'player'} wears "
+        f"{kit}. A real photograph of a real athlete, not a 3D render or doll: natural skin "
+        "texture and hair, anatomically correct hands, matte fabric with natural folds."
+    )
+
+
+def set_inpaint_area(work):
+    """QwenImageEditInpaintPipeline always works at 1024 x 1024; use the work resolution."""
+    try:
+        from diffusers.pipelines.qwenimage import pipeline_qwenimage_edit_inpaint as module
+    except ImportError:
+        return
+    original = getattr(module, "_jasdg_calculate_dimensions", None) or getattr(
+        module, "calculate_dimensions", None
+    )
+    if original is None:
+        return
+    module._jasdg_calculate_dimensions = original
+    module.calculate_dimensions = lambda _area, ratio: original(work * work, ratio)
+
+
 def interleave(crops):
     """Alternate pose families, so a run stopped by its time limit still shows every pose."""
     groups = {}
@@ -175,11 +212,17 @@ def interleave(crops):
 
 
 def load_pipeline(torch, request, log):
+    import diffusers
     from diffusers import (
         FlowMatchEulerDiscreteScheduler,
         GGUFQuantizationConfig,
-        QwenImageEditPlusPipeline,
         QwenImageTransformer2DModel,
+    )
+
+    pipeline_class = (
+        diffusers.QwenImageEditInpaintPipeline
+        if request.get("mode") == "inpaint"
+        else diffusers.QwenImageEditPlusPipeline
     )
 
     dtype = torch.bfloat16
@@ -190,7 +233,7 @@ def load_pipeline(torch, request, log):
         subfolder="transformer",
         torch_dtype=dtype,
     )
-    pipe = QwenImageEditPlusPipeline.from_pretrained(
+    pipe = pipeline_class.from_pretrained(
         request["base_dir"], transformer=transformer, torch_dtype=dtype
     )
     lightning = False
@@ -226,7 +269,12 @@ def main():
     request["device"] = pick_device(torch, request.get("device", "auto"))
     started = time.monotonic()
     pipe, lightning = load_pipeline(torch, request, log)
+    inpaint = request.get("mode") == "inpaint"
+    strength = float(request.get("strength") or 1.0) if inpaint else 1.0
     steps = request["steps"] if lightning else max(request["steps"], 30)
+    # Inpainting starts from the render and skips the first (1 - strength) of the schedule;
+    # stretch the schedule so the model still runs the requested number of denoising steps.
+    total_steps = math.ceil(steps / strength - 1e-9)
     cfg = 1.0 if lightning else 4.0
     log(
         f"QWEN_READY device={request['device']} lightning={lightning} "
@@ -245,37 +293,44 @@ def main():
             )
             break
         began = time.monotonic()
-        pose_image = bool(request.get("pose_image"))
+        pose_image = bool(request.get("pose_image")) and not inpaint
         with Image.open(crops_dir / crop["files"]["rgb"]) as rgb:
             source = rgb.convert("RGB")
-        inpaint_path = crops_dir / crop["files"].get("inpaint", "")
-        if inpaint_path.is_file():
-            with Image.open(inpaint_path) as inpaint:
-                source = isolate(source, inpaint.convert("L"))
+        with Image.open(crops_dir / crop["files"]["inpaint"]) as raw_mask:
+            mask = raw_mask.convert("L")
+        if not inpaint:
+            source = isolate(source, mask)
         images = [source]
         if pose_image:
             with Image.open(crops_dir / crop["files"]["pose"]) as pose:
                 images.append(pose.convert("RGB"))
-        prompt = request.get("prompt") or build_prompt(crop, pose_image)
+        prompt = request.get("prompt") or (
+            inpaint_prompt(crop) if inpaint else build_prompt(crop, pose_image)
+        )
         seed = crop_seed(request["seed"], crop["id"])
         # On "out of memory": free the cache and retry at the same size, then smaller.
         attempt_work, attempts = work, 0
         while True:
             try:
-                set_condition_size(attempt_work)
-                result = pipe(
-                    image=images,
-                    prompt=prompt,
+                arguments = {
+                    "prompt": prompt,
                     # Only used with classifier-free guidance (the 30-step fallback); the
                     # 4-step Lightning schedule runs without it (true_cfg_scale 1).
-                    negative_prompt=NEGATIVE_PROMPT if cfg > 1 else " ",
-                    true_cfg_scale=cfg,
-                    guidance_scale=1.0,
-                    num_inference_steps=steps,
-                    height=attempt_work,
-                    width=attempt_work,
-                    generator=torch.Generator(device="cpu").manual_seed(seed),
-                ).images[0]
+                    "negative_prompt": NEGATIVE_PROMPT if cfg > 1 else " ",
+                    "true_cfg_scale": cfg,
+                    "guidance_scale": 1.0,
+                    "num_inference_steps": total_steps,
+                    "height": attempt_work,
+                    "width": attempt_work,
+                    "generator": torch.Generator(device="cpu").manual_seed(seed),
+                }
+                if inpaint:
+                    set_inpaint_area(attempt_work)
+                    arguments.update(image=source, mask_image=mask, strength=strength)
+                else:
+                    set_condition_size(attempt_work)
+                    arguments.update(image=images)
+                result = pipe(**arguments).images[0]
                 break
             except Exception as exc:
                 attempts += 1
@@ -299,7 +354,9 @@ def main():
                     {
                         "id": crop["id"],
                         "seed": seed,
-                        "steps": steps,
+                        "steps": total_steps,
+                        "mode": "inpaint" if inpaint else "edit",
+                        "strength": strength,
                         "true_cfg_scale": cfg,
                         "lightning": lightning,
                         "resolution": attempt_work,
@@ -310,7 +367,7 @@ def main():
                 + "\n"
             )
         seconds = time.monotonic() - began
-        del result, images
+        del result, images, source, mask
         release_memory(torch)
         log(f"QWEN_CROP {number}/{len(todo)} {crop['id']} {seconds:.0f}")
 

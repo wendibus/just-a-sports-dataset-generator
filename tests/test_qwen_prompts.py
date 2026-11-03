@@ -56,8 +56,16 @@ class PromptTests(unittest.TestCase):
         edge = out.getpixel((60, 50))
         self.assertTrue(30 < edge[0] < 225, edge)  # the other player's edge is smeared
 
+    def test_inpaint_prompt_keeps_the_render_and_forbids_lettering(self):
+        prompt = worker.inpaint_prompt({"label": "player", "pose_family": "run"})
+        self.assertIn("Keep exactly its pose, outline", prompt)
+        self.assertIn("no other lettering", prompt)
+        self.assertIn("running mid-stride", prompt)
+        self.assertIn("referee shirt", worker.inpaint_prompt({"label": "referee"}))
+
     def test_condition_size_follows_the_work_resolution(self):
         worker.set_condition_size(512)  # no diffusers here: must be a no-op, not an error
+        worker.set_inpaint_area(512)
 
 
 if __name__ == "__main__":
