@@ -288,9 +288,7 @@ def main():
     deadline = request.get("deadline")
     for number, crop in enumerate(todo, 1):
         if deadline and time.time() >= deadline:
-            log(
-                f"QWEN_WARNING Zeitlimit erreicht nach {number - 1} Personen; Rest beim nächsten Lauf"
-            )
+            log(f"QWEN_WARNING time limit reached after {number - 1} people; rerun to continue")
             break
         began = time.monotonic()
         pose_image = bool(request.get("pose_image")) and not inpaint
@@ -340,7 +338,7 @@ def main():
                 if attempts > 1:
                     attempt_work = smaller(attempt_work)
                 log(
-                    f"QWEN_WARNING Speicher voll bei {crop['id']}, neuer Versuch mit "
+                    f"QWEN_WARNING out of memory at {crop['id']}, retrying at "
                     f"{attempt_work} px (andere GPU-Programme beenden hilft)"
                 )
         if result.size != (size, size):

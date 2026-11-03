@@ -34,13 +34,13 @@ class PreviewTests(unittest.TestCase):
             source = fixture(root / "render")
             export_dataset(source, root / "dataset")
             before = {p: sha256_file(p) for p in (root / "dataset").rglob("*") if p.is_file()}
-            index = create_preview(root / "dataset", root / "Vorschau")
+            index = create_preview(root / "dataset", root / "Preview")
             for path, checksum in before.items():
                 self.assertEqual(sha256_file(path), checksum)
             raw = root / "dataset/native/scene-000000/frame-000000.instances.png"
             with (
                 Image.open(raw) as original,
-                Image.open(root / "Vorschau/images/0001-mask.png") as colored,
+                Image.open(root / "Preview/images/0001-mask.png") as colored,
             ):
                 self.assertEqual(original.mode, "L")
                 self.assertEqual(original.getextrema(), (0, 4))
@@ -49,9 +49,9 @@ class PreviewTests(unittest.TestCase):
                 for _, color in colored.getcolors():
                     self.assertGreater(max(color), 120)
             page = index.read_text(encoding="utf-8")
-            self.assertIn("6 von 6 Bildern", page)
-            self.assertIn("Farbbild für RF-DETR", page)
-            self.assertIn("Objektbereiche", page)
+            self.assertIn("6 of 6 images", page)
+            self.assertIn("RGB image for RF-DETR", page)
+            self.assertIn("Object regions", page)
             parser = _Images()
             parser.feed(page)
             self.assertEqual(len(parser.sources), 12)
@@ -59,7 +59,7 @@ class PreviewTests(unittest.TestCase):
             for url in parser.sources + parser.links:
                 self.assertTrue((index.parent / unquote(url)).resolve().is_file())
             with (
-                Image.open(root / "Vorschau/images/0001-rgb.png") as thumb,
+                Image.open(root / "Preview/images/0001-rgb.png") as thumb,
                 Image.open((index.parent / unquote(parser.links[0])).resolve()) as original,
             ):
                 self.assertEqual(thumb.tobytes(), original.tobytes())
@@ -69,8 +69,8 @@ class PreviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             export_dataset(fixture(root / "render"), root / "dataset")
-            index = create_preview(root / "dataset", root / "Vorschau", limit=2)
-            self.assertIn("2 von 6 Bildern", index.read_text())
+            index = create_preview(root / "dataset", root / "Preview", limit=2)
+            self.assertIn("2 of 6 images", index.read_text())
             self.assertEqual(len(list((index.parent / "images").glob("*.png"))), 4)
             with self.assertRaises(FileExistsError):
                 create_preview(root / "dataset", index.parent)
@@ -84,8 +84,8 @@ class PreviewTests(unittest.TestCase):
             raw = root / "dataset/native/scene-000000/frame-000000.instances.png"
             Image.new("L", (17, 13), 99).save(raw)
             with self.assertRaises(AnnotationError):
-                create_preview(root / "dataset", root / "Vorschau")
-            self.assertFalse((root / "Vorschau").exists())
+                create_preview(root / "dataset", root / "Preview")
+            self.assertFalse((root / "Preview").exists())
             self.assertEqual(
                 read_json(root / "dataset/manifest.json")["training_target"]["framework"], "RF-DETR"
             )

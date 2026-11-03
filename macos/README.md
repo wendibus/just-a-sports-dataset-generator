@@ -12,17 +12,17 @@ selection and a local progress page that automatically opens the finished galler
 After the quality choice the app asks whether to repaint the players with a local
 Qwen-Image-Edit-2511. If Qwen is not installed, a native dialog lists every download
 (files, sizes, licenses, destination, about 31 GB including a portable Python) and
-installs only after “Herunterladen”; installation progress appears on the progress
+installs only after “Download”; installation progress appears on the progress
 page. No system Python, Homebrew or Terminal is needed. Labels stay unchanged; see
 [pose crops](../docs/POSE_CROPS.md).
 
 ## Cancel and resume
 
-While a run is busy, a second dialog offers **Abbrechen**. It stops the running Blender
+While a run is busy, a second dialog offers **Cancel**. It stops the running Blender
 or Qwen process; finished scenes and generated players are kept in
-`Ausgaben/Durchlauf-….partial`. On the next start the app offers **Fortsetzen**, which
+`Outputs/Run-….partial`. On the next start the app offers **Resume**, which
 renders and generates only what is missing and then publishes the run as
-`Durchlauf-…`. “Neu starten” leaves the unfinished folder in place for manual deletion.
+`Run-…`. “Start over” leaves the unfinished folder in place for manual deletion.
 The same resume behaviour applies after a crash or power loss. The last unfinished run
 is remembered in `launcher-state.json` in the user data folder.
 
@@ -35,9 +35,9 @@ python -m PyInstaller --noconfirm macos/Generator.spec
 ```
 
 The demo renders three 3D images and must use a new output directory. The old
-rectangle fixture is available with `--reference-demo`. Open `Vorschau/index.html` within its
+rectangle fixture is available with `--reference-demo`. Open `Preview/index.html` within its
 output to inspect RGB images alongside colored mask previews. The GUI offers
-“Bilder ansehen” on completion. Raw instance masks retain their numeric IDs and
+“View images” on completion. Raw instance masks retain their numeric IDs and
 may look black in ordinary image viewers.
 
 The bundle uses local ad-hoc signing; distribution is not Apple-notarized. Include

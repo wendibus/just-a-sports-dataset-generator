@@ -288,7 +288,7 @@ class QwenGenerateTests(unittest.TestCase):
                 progress=messages.append,
             )
         self.assertEqual(result.generated, 0)
-        self.assertTrue(any("Zeitlimit" in m for m in messages))
+        self.assertTrue(any("time limit" in m for m in messages))
         # The budget is not a setting: the same folder continues without it.
         result = generate_crops(
             self.root / "crops", self.root / "gen", confirm=never, progress=lambda _: None
@@ -324,8 +324,8 @@ class QwenGenerateTests(unittest.TestCase):
         self.assertEqual({tuple(c["size"]) for c in self.calls()}, {(640, 640)})
         records = (self.root / "big-gen/generation.jsonl").read_text().splitlines()
         self.assertEqual({json.loads(r)["resolution"] for r in records}, {640})
-        self.assertTrue(any("Speicher voll" in m for m in messages))
-        self.assertTrue(any(m.startswith("Person 1/2 fertig") and " s)" in m for m in messages))
+        self.assertTrue(any("out of memory" in m for m in messages))
+        self.assertTrue(any(m.startswith("Person 1/2 done") and " s)" in m for m in messages))
 
 
 if __name__ == "__main__":

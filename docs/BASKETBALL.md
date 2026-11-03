@@ -13,7 +13,7 @@ created by the bundled worker source. Football and futsal remain future stages.
 ```sh
 sports-dataset render-basketball examples/basketball-3d.json --output outputs/render --samples 32
 sports-dataset export outputs/render --output outputs/dataset
-sports-dataset preview outputs/dataset --output outputs/Vorschau
+sports-dataset preview outputs/dataset --output outputs/Preview
 ```
 
 Use new output folders. An interrupted render resumes when the same command is run again: finished scenes in `<output>.partial` are kept, and only the missing ones are rendered. The example generates three 1280×720 images from three

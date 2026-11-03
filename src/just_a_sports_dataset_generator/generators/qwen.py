@@ -54,7 +54,7 @@ def ensure_installed(
         return update_packages(home, progress)
     plan = plan_install(quant, home)
     if not confirm(plan):
-        raise SetupError("Qwen ist nicht installiert und die Installation wurde abgelehnt")
+        raise SetupError("Qwen is not installed and the installation was declined")
     install(plan, progress)
     manifest = installed(home)
     if manifest is None:
@@ -119,7 +119,7 @@ def generate_crops(
             raise FileExistsError(f"output exists and is not a generation run: {output}") from exc
         if header.get("crops_sha256") != crops_sha256 or header.get("settings") != settings:
             raise FileExistsError(f"{output} belongs to different crops or settings")
-        progress("Vorhandener Lauf wird fortgesetzt …")
+        progress("Resuming the existing run …")
     manifest = ensure_installed(confirm, quant, home, progress)
     generator = f"Qwen-Image-Edit-2511 {manifest.get('quant')} + Lightning LoRA, {mode} (local)"
     if not output.exists():
@@ -186,9 +186,9 @@ def _message(line: str) -> str:
     if kind == "QWEN_CROP":
         count, crop, *seconds = rest.split(" ")
         took = f", {seconds[0]} s" if seconds else ""
-        return f"Person {count} fertig ({crop}{took})"
+        return f"Person {count} done ({crop}{took})"
     if kind == "QWEN_READY":
-        return f"Modell geladen ({rest})"
+        return f"Model loaded ({rest})"
     if kind == "QWEN_TODO":
-        return f"Zu generieren: {rest} Personen"
+        return f"To generate: {rest} people"
     return rest or line

@@ -40,7 +40,7 @@ def apple(script: str, *arguments: str) -> str | None:
     if result.returncode:
         if "(-128)" in result.stderr:
             return None
-        raise RuntimeError(result.stderr.strip() or "Der Mac-Dialog konnte nicht geöffnet werden.")
+        raise RuntimeError(result.stderr.strip() or "The Mac dialog could not be opened.")
     return result.stdout.strip()
 
 
@@ -92,7 +92,7 @@ def run_dataset(
         if previous != settings:
             raise FileExistsError(f"{work} belongs to a run with other settings")
         if progress:
-            progress("Abgebrochener Durchlauf wird fortgesetzt …")
+            progress("Resuming an interrupted run …")
     else:
         work.mkdir(parents=True)
         write_json(marker, settings)
@@ -114,25 +114,25 @@ def run_dataset(
                 raise ValueError(log.getvalue().strip())
         source = render
         if repaint:
-            source = work / "fotorealistisch/render"
+            source = work / "photorealistic/render"
             if not source.is_dir():
                 # Qwen is installed beforehand with the user's consent; --yes only skips a
                 # second prompt and never triggers a download on its own here.
-                repaint_args = ["repaint", str(render), "--output", str(work / "fotorealistisch")]
+                repaint_args = ["repaint", str(render), "--output", str(work / "photorealistic")]
                 if cli_main([*repaint_args, "--yes"], progress=progress):
                     raise ValueError(log.getvalue().strip())
-        for derived in (work / "dataset", work / "Vorschau"):
+        for derived in (work / "dataset", work / "Preview"):
             shutil.rmtree(derived, ignore_errors=True)  # quick to recreate from the render
         if progress:
-            progress("Objektmasken prüfen und COCO-Datensatz für RF-DETR erstellen …")
+            progress("Checking object masks and creating the COCO dataset for RF-DETR …")
         if cli_main(["export", str(source), "--output", str(work / "dataset")]):
             raise ValueError(log.getvalue().strip())
-    with (work / "protokoll.txt").open("a", encoding="utf-8") as protocol:
+    with (work / "log.txt").open("a", encoding="utf-8") as protocol:
         protocol.write(log.getvalue())
     report = json.loads((work / "dataset/report.json").read_text(encoding="utf-8"))
     if progress:
-        progress("Farbbilder und Maskenvorschau vorbereiten …")
-    create_preview(work / "dataset", work / "Vorschau")
+        progress("Preparing RGB images and mask preview …")
+    create_preview(work / "dataset", work / "Preview")
     marker.unlink()
     work.rename(destination)
     return report
@@ -177,10 +177,10 @@ class CancelDialog:
 
     def start(self) -> None:
         script = (
-            'display dialog "Die Berechnung läuft lokal auf deinem Mac." & return & return & '
-            '"Abbrechen ist jederzeit möglich. Fertige Szenen und generierte Spieler bleiben '
-            'erhalten und können beim nächsten Start fortgesetzt werden." '
-            f'with title "{TITLE}" buttons {{"Abbrechen"}} default button "Abbrechen"'
+            'display dialog "Rendering runs locally on your Mac." & return & return & '
+            '"You can cancel at any time. Finished scenes and generated players are kept '
+            'and can be resumed at the next start." '
+            f'with title "{TITLE}" buttons {{"Cancel"}} default button "Cancel"'
         )
         self.process = subprocess.Popen(
             ["/usr/bin/osascript", "-e", script],
@@ -193,7 +193,7 @@ class CancelDialog:
     def _wait(self) -> None:
         assert self.process is not None
         output, _ = self.process.communicate()
-        if not self.closed and self.process.returncode == 0 and "Abbrechen" in output:
+        if not self.closed and self.process.returncode == 0 and "Cancel" in output:
             self.cancelled = True
             stop_children(exclude=self.process.pid)
 
@@ -218,12 +218,12 @@ def confirm_download(plan: InstallPlan) -> bool:
     """macOS consent dialog listing every file source, size, license and the destination."""
     answer = apple(
         "on run argv\nactivate\nset answer to display dialog (item 1 of argv) "
-        'with title "Qwen einrichten" buttons {"Abbrechen", "Herunterladen"} '
-        'default button "Herunterladen" cancel button "Abbrechen"\n'
+        'with title "Set up Qwen" buttons {"Cancel", "Download"} '
+        'default button "Download" cancel button "Cancel"\n'
         "return button returned of answer\nend run",
         describe(plan),
     )
-    return answer == "Herunterladen"
+    return answer == "Download"
 
 
 def default_folder() -> Path:
@@ -239,14 +239,14 @@ def gui() -> int:
         destination, saved = resume
         answer = apple(
             "on run argv\nactivate\nset answer to display dialog (item 1 of argv) "
-            'with title (item 2 of argv) buttons {"Neu starten", "Fortsetzen"} '
-            'default button "Fortsetzen"\nreturn button returned of answer\nend run',
-            "Ein abgebrochener Durchlauf wurde gefunden:\n"
-            f"{destination.name}\n\nFertige Szenen und generierte Spieler bleiben erhalten; "
-            "nur der Rest wird berechnet.",
+            'with title (item 2 of argv) buttons {"Start over", "Resume"} '
+            'default button "Resume"\nreturn button returned of answer\nend run',
+            "An interrupted run was found:\n"
+            f"{destination.name}\n\nFinished scenes and generated players are kept; "
+            "only the rest is computed.",
             TITLE,
         )
-        if answer == "Fortsetzen":
+        if answer == "Resume":
             find_blender()
             return execute(
                 destination,
@@ -258,12 +258,12 @@ def gui() -> int:
         forget_unfinished()  # the folder stays; it can be deleted by hand
     choice = apple(
         "on run argv\nactivate\nset answer to display dialog "
-        '("Version " & (item 1 of argv) & " · lokal · RF-DETR" & return & return & '
-        '"3D-Basketball: Halle, Spieler, Schiedsrichter, Ball und Körbe mit COCO-Labels." & '
-        'return & "Prozedurale Figuren; noch kein validierter Fotorealismus." & '
-        'return & return & "Basketball starten: 3 Bilder. Blender 5.x wird lokal benötigt.") '
-        'with title (item 2 of argv) buttons {"Beenden", "Rezept wählen", "Basketball starten"} '
-        'default button "Basketball starten" cancel button "Beenden"\n'
+        '("Version " & (item 1 of argv) & " · local · RF-DETR" & return & return & '
+        '"3D basketball: hall, players, referees, ball and hoops with COCO labels." & '
+        'return & "Procedural figures; photorealism not validated yet." & '
+        'return & return & "Start basketball: 3 images. Requires a local Blender 5.x.") '
+        'with title (item 2 of argv) buttons {"Quit", "Choose recipe", "Start basketball"} '
+        'default button "Start basketball" cancel button "Quit"\n'
         "return button returned of answer\nend run",
         __version__,
         TITLE,
@@ -271,112 +271,112 @@ def gui() -> int:
     if choice is None:
         return 0
     find_blender()
-    demo = choice == "Basketball starten"
+    demo = choice == "Start basketball"
     recipe = RESOURCES / "examples/basketball-3d.json"
     if not demo:
         selected = apple(
-            'activate\nset selected to choose file with prompt "Datensatz-Rezept (JSON) auswählen" '
+            'activate\nset selected to choose file with prompt "Choose a dataset recipe (JSON)" '
             'of type {"public.json"}\nreturn POSIX path of selected'
         )
         if selected is None:
             return 0
         recipe = Path(selected)
     quality = apple(
-        'set answer to display dialog "Bildqualität wählen. Höhere Qualität benötigt mehr Rechenzeit." '
-        'with title "Basketball-Bildqualität" buttons {"Abbrechen", "Standard", "Fein"} '
-        'default button "Standard" cancel button "Abbrechen"\nreturn button returned of answer'
+        'set answer to display dialog "Choose the image quality. Higher quality takes longer." '
+        'with title "Basketball image quality" buttons {"Cancel", "Standard", "Fine"} '
+        'default button "Standard" cancel button "Cancel"\nreturn button returned of answer'
     )
     if quality is None:
         return 0
     photo = apple(
-        'set answer to display dialog "Spieler zusätzlich fotorealistisch mit Qwen-Image-Edit '
-        'nachbearbeiten?" & return & return & "Läuft lokal und dauert etwa 1–4 Minuten pro '
-        "Person. Die Labels bleiben unverändert. Beim ersten Mal wird Qwen nach Rückfrage "
-        'eingerichtet (ca. 31 GB)." with title "Fotorealistische Spieler" '
-        'buttons {"Abbrechen", "Nein", "Ja"} default button "Nein" cancel button "Abbrechen"\n'
+        'set answer to display dialog "Also repaint the players photorealistically with '
+        'Qwen-Image-Edit?" & return & return & "Runs locally and takes about 1–2 minutes per '
+        "person. The labels stay unchanged. On first use Qwen is set up after asking "
+        '(about 31 GB)." with title "Photorealistic players" '
+        'buttons {"Cancel", "No", "Yes"} default button "No" cancel button "Cancel"\n'
         "return button returned of answer"
     )
     if photo is None:
         return 0
     folder = apple(
         "on run argv\nactivate\nset selected to choose folder with prompt "
-        '"Ausgabeordner wählen. Es wird ein neuer Durchlauf angelegt." '
+        '"Choose the output folder. A new run is created there." '
         "default location (POSIX file (item 1 of argv))\nreturn POSIX path of selected\nend run",
         str(default_folder()),
     )
     if folder is None:
         return 0
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    destination = Path(folder) / "Ausgaben" / f"Durchlauf-{stamp}-{uuid4().hex[:6]}"
-    return execute(destination, recipe, demo, 64 if quality == "Fein" else 32, photo == "Ja")
+    destination = Path(folder) / "Outputs" / f"Run-{stamp}-{uuid4().hex[:6]}"
+    return execute(destination, recipe, demo, 64 if quality == "Fine" else 32, photo == "Yes")
 
 
 def execute(destination: Path, recipe: Path, demo: bool, samples: int, repaint: bool) -> int:
-    """Run (or resume) one Durchlauf with a progress page and an Abbrechen dialog."""
+    """Run (or resume) one run with a progress page and a Cancel dialog."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    progress_page = destination.parent / (destination.name + "-Fortschritt.html")
+    progress_page = destination.parent / (destination.name + "-progress.html")
 
     def progress(message: str, *, finished: bool = False, failed: bool = False) -> None:
-        url = quote(destination.name + "/Vorschau/index.html", safe="/")
+        url = quote(destination.name + "/Preview/index.html", safe="/")
         refresh = (
             f'<meta http-equiv="refresh" content="0;url={url}">'
             if finished
             else ("" if failed else '<meta http-equiv="refresh" content="5">')
         )
         page = (
-            '<!doctype html><html lang="de"><meta charset="utf-8">'
+            '<!doctype html><html lang="en"><meta charset="utf-8">'
             + refresh
-            + "<title>Basketball wird erzeugt</title><style>body{font:18px/1.6 system-ui;"
+            + "<title>Generating basketball images</title><style>body{font:18px/1.6 system-ui;"
             "background:#f3f5f8;color:#182333;max-width:800px;margin:70px auto;padding:24px}"
             "h1{font-size:32px}.box{background:white;border:1px solid #d9e0e9;border-radius:16px;padding:28px}"
-            '</style><h1>Deine Basketballbilder</h1><div class="box"><p>'
+            '</style><h1>Your basketball images</h1><div class="box"><p>'
             + escape(message)
-            + "</p><p>Die Berechnung läuft vollständig auf deinem Mac. Je nach Qualität kann "
-            "ein Bild mehrere Minuten benötigen. Die Vorschau öffnet sich nach Abschluss.</p></div></html>"
+            + "</p><p>Everything runs on your Mac. Depending on the quality, one image can take "
+            "several minutes. The preview opens when it is done.</p></div></html>"
         )
         temporary = progress_page.with_suffix(".tmp")
         temporary.write_text(page, encoding="utf-8")
         temporary.replace(progress_page)
 
-    progress("Blender wird vorbereitet …")
+    progress("Preparing Blender …")
     subprocess.run(["/usr/bin/open", str(progress_page)], check=True)
     remember_unfinished(destination)
     cancel = CancelDialog()
     cancel.start()
     try:
         if repaint:
-            progress("Qwen wird geprüft …")
+            progress("Checking Qwen …")
             ensure_installed(confirm_download, progress=progress)
         result = run_dataset(
             recipe, destination, demo, progress=progress, samples=samples, repaint=repaint
         )
     except Exception:
         if cancel.cancelled:
-            progress("Abgebrochen. Beim nächsten Start kannst du fortsetzen.", failed=True)
+            progress("Cancelled. You can resume at the next start.", failed=True)
             message(
-                "Die Berechnung wurde abgebrochen.\n\nFertige Szenen bleiben erhalten. "
-                "Beim nächsten Start bietet die App „Fortsetzen“ an."
+                "The run was cancelled.\n\nFinished scenes are kept. "
+                "At the next start the app offers \u201cResume\u201d."
             )
             return 0
-        progress("Die Berechnung wurde abgebrochen. Die App zeigt die Fehlermeldung.", failed=True)
+        progress("The run stopped. The app shows the error message.", failed=True)
         raise
     finally:
         cancel.close()
     forget_unfinished()
-    progress("Fertig. Die Bildvorschau wird geöffnet.", finished=True)
+    progress("Done. Opening the image preview.", finished=True)
     completed = apple(
         "on run argv\nactivate\nset answer to display dialog (item 1 of argv) "
-        'with title (item 2 of argv) buttons {"Schließen", "Trainingsordner", "Bilder ansehen"} '
-        'default button "Bilder ansehen"\nreturn button returned of answer\nend run',
-        f"Fertig: {result['images']} Bilder, {result['annotations']} Objektboxen.\n\n"
-        f"„Bilder ansehen“ zeigt die Farbbilder und farbige Objektbereiche.\n"
-        f"Für Reco Trainer / RF-DETR den Ordner „dataset/coco“ importieren.\n"
-        f"Reco Trainer teilt Training und Test beim Import neu auf.\n\n{destination}",
+        'with title (item 2 of argv) buttons {"Close", "Training folder", "View images"} '
+        'default button "View images"\nreturn button returned of answer\nend run',
+        f"Done: {result['images']} images, {result['annotations']} object boxes.\n\n"
+        "\u201cView images\u201d shows the RGB images and colored object regions.\n"
+        "For Reco Trainer / RF-DETR, import the folder \u201cdataset/coco\u201d.\n"
+        f"Reco Trainer re-splits training and test data on import.\n\n{destination}",
         TITLE,
     )
-    if completed == "Bilder ansehen":
-        subprocess.run(["/usr/bin/open", str(destination / "Vorschau/index.html")], check=True)
-    elif completed == "Trainingsordner":
+    if completed == "View images":
+        subprocess.run(["/usr/bin/open", str(destination / "Preview/index.html")], check=True)
+    elif completed == "Training folder":
         subprocess.run(["/usr/bin/open", str(destination / "dataset/coco")], check=True)
     return 0
 
@@ -405,7 +405,7 @@ def main() -> int:
     try:
         return gui()
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
-        message(f"Der Durchlauf konnte nicht abgeschlossen werden.\n\n{exc}")
+        message(f"The run could not be completed.\n\n{exc}")
         return 2
 
 
