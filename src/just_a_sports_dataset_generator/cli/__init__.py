@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from just_a_sports_dataset_generator import __version__
+from just_a_sports_dataset_generator.camera_look import PRESETS, apply_camera_look
 from just_a_sports_dataset_generator.composite import BLENDS, composite_crops
 from just_a_sports_dataset_generator.crops import export_crops
 from just_a_sports_dataset_generator.exporters import LocalDatasetExporter
@@ -74,6 +75,19 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="only people fully in frame, every body joint visible and nobody else close by",
     )
+    look = subcommands.add_parser(
+        "camera-look",
+        help="degrade a copy of a render like a real camera (labels unchanged)",
+    )
+    look.add_argument("render", type=Path)
+    look.add_argument("--output", "-o", type=Path, required=True)
+    look.add_argument(
+        "--preset",
+        choices=tuple(PRESETS),
+        default="reco",
+        help="reco: stitched, compressed panorama stream; light: broadcast-style",
+    )
+    look.add_argument("--seed", type=int, default=0)
     composite = subcommands.add_parser(
         "composite-crops", help="paste generated person crops back into a copy of a render"
     )
@@ -230,6 +244,13 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
     if args.command == "preview":
         index = create_preview(args.source, args.output)
         print(f"preview: {index}")
+        return 0
+    if args.command == "camera-look":
+        result = apply_camera_look(args.render, args.output, preset=args.preset, seed=args.seed)
+        print(
+            f"camera look '{args.preset}' applied to {result.frames} frames in {args.output} "
+            f"(parameters in camera-look.json)"
+        )
         return 0
     if args.command == "composite-crops":
         merged = composite_crops(
