@@ -14,7 +14,9 @@ a = Analysis(
             "just_a_sports_dataset_generator/renderers/blender_worker"),
            # Run by the separate Qwen runtime as a file, so it must ship outside the archive.
            (str(root / "src/just_a_sports_dataset_generator/generators/qwen_worker.py"),
-            "just_a_sports_dataset_generator/generators")],
+            "just_a_sports_dataset_generator/generators"),
+           (str(root / "src/just_a_sports_dataset_generator/sports/equipment.json"),
+            "just_a_sports_dataset_generator/sports")],
     excludes=["numpy", "tkinter", "pycocotools"],
 )
 pyz = PYZ(a.pure)

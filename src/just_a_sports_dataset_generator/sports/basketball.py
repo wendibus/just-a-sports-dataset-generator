@@ -17,8 +17,11 @@ import math
 import random
 from dataclasses import dataclass, replace
 
-LAYOUT_SCHEMA = "1.1"
-"""1.1: per-frame joints (animated poses, real jump arcs) and team benches."""
+from just_a_sports_dataset_generator.sports.equipment import choose_ball, choose_referee_kit
+
+LAYOUT_SCHEMA = "1.2"
+"""1.1: per-frame joints (animated poses, real jump arcs) and team benches.
+1.2: ``equipment`` with the match ball design and the referee kit (docs/EQUIPMENT.md)."""
 COURT_HALF_LENGTH, COURT_HALF_WIDTH = 14.0, 7.5
 RIM_X, RIM_Z, BALL_RADIUS = 12.425, 3.05, 0.12
 FRAME_INTERVAL = 0.2
@@ -507,6 +510,14 @@ def plan_scene(seed: int, frames: int) -> dict[str, object]:
         motions,
     )
     xs = [r[0].x for r in roots.values()]
+    # A separate random stream: adding equipment must not change any earlier layout choice.
+    equipment_rng = random.Random(f"basketball-equipment:v1:{seed}")
+    ball_design = choose_ball(equipment_rng, "basketball").render_spec()
+    referee_kit = choose_referee_kit(equipment_rng, "basketball", kits).render_spec()
+    for athlete in athletes:
+        if athlete["team"] == 2:
+            athlete["kit"] = referee_kit["shirt"]
+            athlete["referee_kit"] = referee_kit
     return {
         "schema_version": LAYOUT_SCHEMA,
         "seed": seed,
@@ -518,6 +529,7 @@ def plan_scene(seed: int, frames: int) -> dict[str, object]:
         "benches": _benches(rng, kits),
         "athletes": athletes,
         "ball": ball,
+        "equipment": {"ball": ball_design, "referee_kit": referee_kit},
     }
 
 

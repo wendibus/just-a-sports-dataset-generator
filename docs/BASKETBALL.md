@@ -70,9 +70,12 @@ the plan's version, situation, ball event and checksum as an asset.
   follows its event, so consecutive frames differ while instance IDs stay stable.
 - **Kit**: players wear a tank-top jersey over a skin torso, with deep armholes, a scoop
   neckline, wide shoulder panels, contrasting piping and the number front and back, and
-  knee-length shorts joined at the seat; referees wear a crew-neck striped shirt with
-  short sleeves. A believable 3D cut matters for photorealistic repainting: image-edit
-  models keep the silhouette they are given.
+  knee-length shorts joined at the seat. A believable 3D cut matters for photorealistic
+  repainting: image-edit models keep the silhouette they are given.
+- **Referees and ball** (layout schema 1.2): each scene samples a referee kit (grey with
+  black sleeves, orange, black with neon accents or black/white stripes, always with long
+  black trousers) that differs from both team kits, and a ball design (classic orange,
+  orange/ivory, orange/black, dark brown). See [balls and referee kits](EQUIPMENT.md).
 - **Animation** (layout schema 1.1): every frame has its own joints. Runners cycle their
   legs and swing the opposite arm with a stride from their speed and face where they run;
   defenders shuffle; dribblers push the ball down in time with the bounce; passers extend
