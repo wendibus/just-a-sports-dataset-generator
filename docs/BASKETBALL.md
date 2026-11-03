@@ -68,6 +68,11 @@ the plan's version, situation, ball event and checksum as an asset.
 - **Motion**: frames are 0.2 s apart. Athletes move with situation-dependent velocities
   (up to about 6 m/s in transition, static at free throws and jump balls) and the ball
   follows its event, so consecutive frames differ while instance IDs stay stable.
+- **Kit**: players wear a tank-top jersey over a skin torso, with deep armholes, a scoop
+  neckline, wide shoulder panels, contrasting piping and the number front and back, and
+  knee-length shorts joined at the seat; referees wear a crew-neck striped shirt with
+  short sleeves. A believable 3D cut matters for photorealistic repainting: image-edit
+  models keep the silhouette they are given.
 - **Animation** (layout schema 1.1): every frame has its own joints. Runners cycle their
   legs and swing the opposite arm with a stride from their speed and face where they run;
   defenders shuffle; dribblers push the ball down in time with the bounce; passers extend

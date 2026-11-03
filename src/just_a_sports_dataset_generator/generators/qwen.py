@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,8 @@ from .qwen_setup import (
 )
 
 WORKER = Path(__file__).with_name("qwen_worker.py")
+PROMPT_VERSION = 4
+"""Must match qwen_worker.PROMPT_VERSION; part of a run's fingerprint so runs never mix."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +72,11 @@ def generate_crops(
     device: str = "auto",
     prompt: str | None = None,
     quant: str = "Q4_K_M",
+    resolution: int = 768,
+    pose_image: bool = False,
+    mode: str = "inpaint",
+    strength: float = 0.75,
+    time_limit: float | None = None,
     home: Path | None = None,
     progress: Callable[[str], None] = print,
 ) -> GenerateResult:
@@ -76,6 +84,14 @@ def generate_crops(
         raise ValueError("steps must be an integer between 1 and 100")
     if type(seed) is not int or seed < 0:
         raise ValueError("seed must be a non-negative integer")
+    if type(resolution) is not int or not 256 <= resolution <= 2048:
+        raise ValueError("resolution must be an integer between 256 and 2048")
+    if mode not in ("inpaint", "edit"):
+        raise ValueError("mode must be inpaint or edit")
+    if not 0.1 <= strength <= 1.0:
+        raise ValueError("strength must be between 0.1 and 1.0")
+    if time_limit is not None and not time_limit > 0:
+        raise ValueError("time_limit must be a positive number of minutes")
     if device not in ("auto", "mps", "cuda", "cpu"):
         raise ValueError("device must be auto, mps, cuda or cpu")
     crops, output = crops.resolve(), output.absolute()
@@ -85,7 +101,17 @@ def generate_crops(
     crops_sha256 = hashlib.sha256(index_path.read_bytes()).hexdigest()
     total = len(json.loads(index_path.read_text(encoding="utf-8"))["crops"])
     header_path = output / "generation.json"
-    settings = {"steps": steps, "seed": seed, "prompt": prompt, "quant": quant}
+    settings = {
+        "steps": steps,
+        "seed": seed,
+        "prompt": prompt,
+        "prompt_version": PROMPT_VERSION,
+        "quant": quant,
+        "resolution": resolution,
+        "pose_image": pose_image,
+        "mode": mode,
+        "strength": strength if mode == "inpaint" else None,
+    }
     if output.exists():
         try:
             header = json.loads(header_path.read_text(encoding="utf-8"))
@@ -95,7 +121,7 @@ def generate_crops(
             raise FileExistsError(f"{output} belongs to different crops or settings")
         progress("Vorhandener Lauf wird fortgesetzt …")
     manifest = ensure_installed(confirm, quant, home, progress)
-    generator = f"Qwen-Image-Edit-2511 {manifest.get('quant')} + Lightning LoRA (local)"
+    generator = f"Qwen-Image-Edit-2511 {manifest.get('quant')} + Lightning LoRA, {mode} (local)"
     if not output.exists():
         output.mkdir(parents=True)
         write_json(
@@ -121,6 +147,12 @@ def generate_crops(
             "seed": seed,
             "device": device,
             "prompt": prompt,
+            "resolution": resolution,
+            "pose_image": pose_image,
+            "mode": mode,
+            "strength": strength,
+            # Not part of the settings: a resumed run may get a different budget.
+            "deadline": time.time() + time_limit * 60 if time_limit else None,
         },
     )
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONHOME", "PYTHONPATH")}
@@ -152,8 +184,9 @@ def generate_crops(
 def _message(line: str) -> str:
     kind, _, rest = line.partition(" ")
     if kind == "QWEN_CROP":
-        count, _, crop = rest.partition(" ")
-        return f"Person {count} fertig ({crop})"
+        count, crop, *seconds = rest.split(" ")
+        took = f", {seconds[0]} s" if seconds else ""
+        return f"Person {count} fertig ({crop}{took})"
     if kind == "QWEN_READY":
         return f"Modell geladen ({rest})"
     if kind == "QWEN_TODO":

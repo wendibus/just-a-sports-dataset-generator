@@ -5,6 +5,7 @@ Invoked by the Apache-2.0 host through a JSON/file boundary. Object Index is
 exported from the SAME Cycles render as RGB, without color management or AA.
 """
 
+import itertools
 import json
 import math
 import random
@@ -450,33 +451,121 @@ def hoop(sign, identity, white, steel):
     limb("Backboard support", (sign * 15, 0, 4.5), (sign * 12.9, 0, 3.65), 0.10, 0.10, steel)
 
 
-def jersey_mesh(mat, identity, root, drop):
-    rings = [
-        (0.92, 0.20, 0.13),
-        (1.08, 0.20, 0.135),
-        (1.34, 0.25, 0.15),
-        (1.48, 0.27, 0.145),
-        (1.57, 0.17, 0.11),
-    ]
-    vertices = [
-        (math.cos(i * math.tau / 24) * rx, math.sin(i * math.tau / 24) * ry, z - drop)
-        for z, rx, ry in rings
-        for i in range(24)
-    ]
+# Torso cross-sections (height, half-width x, half-depth y), athlete-local metres.
+TORSO_RINGS = (
+    (0.90, 0.200, 0.130),
+    (1.08, 0.200, 0.135),
+    (1.34, 0.250, 0.150),
+    (1.48, 0.265, 0.145),
+    (1.53, 0.215, 0.125),
+    (1.58, 0.120, 0.095),
+)
+
+
+def torso_radius(z):
+    rings = TORSO_RINGS
+    if z <= rings[0][0]:
+        return rings[0][1:]
+    for (z0, x0, y0), (z1, x1, y1) in itertools.pairwise(rings):
+        if z <= z1:
+            t = (z - z0) / (z1 - z0)
+            return x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+    return rings[-1][1:]
+
+
+def angular_distance(a, b):
+    return abs((a - b + math.pi) % math.tau - math.pi)
+
+
+def jersey_top(theta, armholes=True):
+    """Upper edge of a basketball tank top at angle theta (front = 3pi/2, sides = 0, pi).
+
+    Deep armholes at the sides, a scoop neckline in front, a shallower one at the back,
+    and wide shoulder panels in between: no straps, no square cut.
+    """
+    top = 1.52
+    side = min(angular_distance(theta, 0.0), angular_distance(theta, math.pi))
+    if not armholes:  # crew-neck shirt: the sleeves attach at the shoulder seam
+        front = angular_distance(theta, 1.5 * math.pi)
+        return min(top, 1.47 + 0.05 * min(front / 0.6, 1.0) ** 2)
+    if side < 0.78:
+        top = min(top, 1.25 + (1.52 - 1.25) * (side / 0.78) ** 2)
+    front = angular_distance(theta, 1.5 * math.pi)
+    if front < 0.82:
+        top = min(top, 1.33 + (1.52 - 1.33) * (front / 0.82) ** 2)
+    back = angular_distance(theta, 0.5 * math.pi)
+    if back < 0.7:
+        top = min(top, 1.43 + (1.52 - 1.43) * (back / 0.7) ** 2)
+    return top
+
+
+def surface(name, columns, rows, point, mat, identity, parent, closed_top=False):
+    vertices = [point(c, r) for c in range(columns) for r in range(rows)]
     faces = [
-        (j * 24 + i, j * 24 + (i + 1) % 24, (j + 1) * 24 + (i + 1) % 24, (j + 1) * 24 + i)
-        for j in range(4)
-        for i in range(24)
+        (
+            c * rows + r,
+            ((c + 1) % columns) * rows + r,
+            ((c + 1) % columns) * rows + r + 1,
+            c * rows + r + 1,
+        )
+        for c in range(columns)
+        for r in range(rows - 1)
     ]
-    mesh = bpy.data.meshes.new("Tailored jersey")
+    if closed_top:
+        faces.append(tuple(c * rows + rows - 1 for c in reversed(range(columns))))
+    mesh = bpy.data.meshes.new(name)
     mesh.from_pydata(vertices, [], faces)
-    obj = bpy.data.objects.new("Jersey", mesh)
+    obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
-    finish(obj, "Jersey", mat, identity, root)
-    mod = obj.modifiers.new("Cloth silhouette", "SUBSURF")
-    mod.levels = 1
+    finish(obj, name, mat, identity, parent)
     for poly in mesh.polygons:
         poly.use_smooth = True
+    return obj
+
+
+def jersey_mesh(mat, identity, root, drop, skin=None, trim=None, armholes=True):
+    """Skin torso, a tank-top jersey over it, and piping along the jersey's openings."""
+    columns, rows, hem = 64, 16, 0.90
+
+    def torso(c, r):
+        theta = c * math.tau / columns
+        z = hem + (1.60 - hem) * r / (rows - 1)
+        rx, ry = torso_radius(z)
+        return (math.cos(theta) * rx * 0.97, math.sin(theta) * ry * 0.97, z - drop)
+
+    if skin is not None:
+        surface("Torso", columns, rows, torso, skin, identity, root, closed_top=True)
+
+    def shirt(c, r):
+        theta = c * math.tau / columns
+        z = hem + (jersey_top(theta, armholes) - hem) * r / (rows - 1)
+        rx, ry = torso_radius(z)
+        loose = 1.06 + 0.04 * (1 - r / (rows - 1))  # fabric hangs slightly away at the hem
+        return (math.cos(theta) * rx * loose, math.sin(theta) * ry * loose, z - drop)
+
+    obj = surface("Jersey", columns, rows, shirt, mat, identity, root)
+    mod = obj.modifiers.new("Cloth silhouette", "SUBSURF")
+    mod.levels = 1
+    if trim is not None:
+        edge = [shirt(c, rows - 1) for c in range(columns)]
+        line(
+            "Jersey piping",
+            [(x * 1.01, y * 1.01, z) for x, y, z in edge],
+            trim,
+            0.008,
+            identity,
+            root,
+            True,
+        )
+        line(
+            "Jersey hem",
+            [shirt(c, 0) for c in range(columns)],
+            trim,
+            0.006,
+            identity,
+            root,
+            True,
+        )
 
 
 # OpenPose BODY_18 order, the format pose ControlNets expect.
@@ -556,7 +645,10 @@ def athlete(plan):
     white = material("Socks and lettering", (light, light, light * 0.93), 0.8)
     socks = material("Socks", (0.88, 0.88, 0.82), 0.8)
     shorts = kit if team < 2 else dark
-    jersey_mesh(kit, identity, upper, drop)
+    trim = white if team < 2 else dark
+    jersey_mesh(kit, identity, upper, drop, skin=skin, trim=trim, armholes=team < 2)
+    # Shorts body over the hips: connects both legs like real loose shorts.
+    oval("Shorts seat", (0, 0.01, 0.9 - drop), (0.215, 0.15, 0.17), shorts, identity, upper)
     neck = j["neck"]
     oval("Neck", (neck[0], neck[1], neck[2] + 0.04), (0.075, 0.075, 0.11), skin, identity, upper)
     head = j["head"]
@@ -577,7 +669,7 @@ def athlete(plan):
         hip, knee, ankle = j[hip_n], j[knee_n], j[ankle_n]
 
         def split(joints, hip_n=hip_n, knee_n=knee_n):
-            return along(joints[hip_n], joints[knee_n], 0.45)
+            return along(joints[hip_n], joints[knee_n], 0.72)  # knee-length shorts
 
         def sock_top(joints, ankle_n=ankle_n, knee_n=knee_n):
             return along(joints[ankle_n], joints[knee_n], 0.4)
@@ -586,7 +678,7 @@ def athlete(plan):
             return lambda joints: joints[name]
 
         between(
-            limb("Shorts leg", hip, split(j), 0.14, 0.13, shorts, identity, root), get(hip_n), split
+            limb("Shorts leg", hip, split(j), 0.15, 0.14, shorts, identity, root), get(hip_n), split
         )
         between(
             limb("Thigh", split(j), knee, 0.105, 0.080, skin, identity, root), split, get(knee_n)
@@ -616,12 +708,22 @@ def athlete(plan):
         at_joint(sole, ankle_n, (0.0, -0.06, 0.026 - ankle[2]))
         shoulder_n, elbow_n, wrist_n = f"{prefix}_shoulder", f"{prefix}_elbow", f"{prefix}_wrist"
         shoulder, elbow, wrist = j[shoulder_n], j[elbow_n], j[wrist_n]
-        at_joint(oval("Shoulder", shoulder, (0.098, 0.098, 0.11), skin, identity, root), shoulder_n)
+        cover = skin if team < 2 else kit  # a referee's shoulders are inside the shirt
+        at_joint(
+            oval("Shoulder", shoulder, (0.098, 0.098, 0.11), cover, identity, root), shoulder_n
+        )
         between(
             limb("Upper arm", shoulder, elbow, 0.083, 0.061, skin, identity, root),
             get(shoulder_n),
             get(elbow_n),
         )
+        if team == 2:  # referee shirt: short sleeves over the upper arm
+
+            def sleeve_end(joints, shoulder_n=shoulder_n, elbow_n=elbow_n):
+                return along(joints[shoulder_n], joints[elbow_n], 0.5)
+
+            sleeve = limb("Sleeve", shoulder, sleeve_end(j), 0.1, 0.085, kit, identity, root)
+            between(sleeve, get(shoulder_n), sleeve_end)
         at_joint(oval("Elbow", elbow, (0.061, 0.061, 0.061), skin, identity, root), elbow_n)
         between(
             limb("Forearm", elbow, wrist, 0.061, 0.035, skin, identity, root),
@@ -640,11 +742,11 @@ def athlete(plan):
     torso_z = 1.20 - drop
     if team < 2:
         text_object(
-            str(plan["number"]), (0, -0.153, torso_z), 0.19, white, identity=identity, parent=upper
+            str(plan["number"]), (0, -0.168, torso_z), 0.19, white, identity=identity, parent=upper
         )
         text_object(
             str(plan["number"]),
-            (0, 0.155, torso_z),
+            (0, 0.168, torso_z),
             0.21,
             white,
             rotation=(math.pi / 2, 0, math.pi),
@@ -655,9 +757,14 @@ def athlete(plan):
             trim = [(side * 0.203, 0, 0.96 - drop), (side * 0.25, 0, 1.44 - drop)]
             line("Uniform trim", trim, white, 0.012, identity, upper)
     else:
-        for x in (-0.15, -0.075, 0, 0.075, 0.15):
-            stripe = [(x, -0.139, 1.02 - drop), (x, -0.151, 1.45 - drop)]
-            line("Referee stripe", stripe, dark, 0.014, identity, upper)
+        for side in (-1, 1):  # front and back: referee shirts are striped all around
+            for x in (-0.15, -0.075, 0, 0.075, 0.15):
+                # On the shirt's surface (the shirt hangs 6-10 % away from the torso).
+                stripe = [
+                    (x, side * (torso_radius(z)[1] * 1.1 + 0.004), z - drop)
+                    for z in (1.0, 1.15, 1.3, 1.44)
+                ]
+                line("Referee stripe", stripe, dark, 0.014, identity, upper)
     RIGS[identity] = (upper, drop, updaters)
     SKELETONS[identity] = (root, {name: j[name] for name in OPENPOSE_18})
     return root

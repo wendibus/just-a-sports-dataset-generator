@@ -69,6 +69,11 @@ def _parser() -> argparse.ArgumentParser:
     crops.add_argument("--margin", type=float, default=0.25)
     crops.add_argument("--min-height", type=int, default=24)
     crops.add_argument("--dilate", type=int, default=9)
+    crops.add_argument(
+        "--isolated",
+        action="store_true",
+        help="only people fully in frame, every body joint visible and nobody else close by",
+    )
     composite = subcommands.add_parser(
         "composite-crops", help="paste generated person crops back into a copy of a render"
     )
@@ -106,6 +111,36 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--device", choices=("auto", "mps", "cuda", "cpu"), default="auto")
         command.add_argument("--prompt", help="replace the built-in player/referee prompts")
         command.add_argument("--quant", choices=QUANTS, default="Q4_K_M")
+        command.add_argument(
+            "--resolution",
+            type=int,
+            default=768,
+            help="largest side Qwen works at (default 768; 1024 is slower and sharper)",
+        )
+        command.add_argument(
+            "--pose-image",
+            action="store_true",
+            help="also give Qwen the OpenPose skeleton (more tokens, roughly 2x slower)",
+        )
+        command.add_argument(
+            "--mode",
+            choices=("inpaint", "edit"),
+            default="inpaint",
+            help="inpaint: repaint only inside the person's mask, starting from the render "
+            "(keeps outline and camera); edit: let Qwen redraw the whole crop",
+        )
+        command.add_argument(
+            "--strength",
+            type=float,
+            default=0.75,
+            help="inpaint only: how far from the render Qwen may move (0.1-1.0, default 0.75)",
+        )
+        command.add_argument(
+            "--time-limit",
+            type=float,
+            metavar="MINUTES",
+            help="start no new person after this many minutes; rerun to continue",
+        )
         command.add_argument("--yes", action="store_true", help="approve a needed download")
     preview = subcommands.add_parser(
         "preview", help="write an offline RGB and colored-mask preview"
@@ -152,6 +187,11 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             device=args.device,
             prompt=args.prompt,
             quant=args.quant,
+            resolution=args.resolution,
+            pose_image=args.pose_image,
+            time_limit=args.time_limit,
+            mode=args.mode,
+            strength=args.strength,
             progress=report,
         )
         print(f"{made.generated} von {made.total} Personen generiert in {args.output}")
@@ -172,6 +212,11 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             device=args.device,
             prompt=args.prompt,
             quant=args.quant,
+            resolution=args.resolution,
+            pose_image=args.pose_image,
+            time_limit=args.time_limit,
+            mode=args.mode,
+            strength=args.strength,
             progress=report,
         )
         merged = composite_crops(
@@ -206,11 +251,23 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
         return 0
     if args.command == "export-crops":
         result = export_crops(
-            args.source, args.output, args.size, args.margin, args.min_height, args.dilate
+            args.source,
+            args.output,
+            args.size,
+            args.margin,
+            args.min_height,
+            args.dilate,
+            isolated=args.isolated,
         )
         print(
             f"wrote {result.crops} person crops to {args.output} "
-            f"({result.skipped_small} smaller than {args.min_height} px skipped)"
+            f"({result.skipped_small} smaller than {args.min_height} px skipped"
+            + (
+                f", {result.skipped_not_isolated} not fully visible or not alone"
+                if args.isolated
+                else ""
+            )
+            + ")"
         )
         return 0
     if args.command == "export":

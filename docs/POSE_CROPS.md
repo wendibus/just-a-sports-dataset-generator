@@ -59,21 +59,108 @@ the same command is run again; finished people are skipped.
 
 `generate-crops CROPS --output GENERATED` repaints each crop with Qwen-Image-Edit-2511
 (GGUF `--quant`, default Q4_K_M) and the 4-step Lightning LoRA. The model receives the
-RGB crop and the pose skeleton as two input images and a built-in prompt (player or
-referee) asking for a photorealistic person in exactly that pose, position and size,
-with the original kit colours; `--prompt` replaces it. Seeds are derived from `--seed`
-and the crop ID, so a rerun reproduces a crop. `--device auto` uses Apple Metal (MPS),
-then CUDA, then CPU. If the Lightning LoRA cannot be applied to the quantized model, the
-run falls back to 30 steps with classifier-free guidance and says so.
+RGB crop, with everything outside the person's inpaint mask blurred, and a built-in
+prompt; `--prompt` replaces it. `--pose-image` adds the OpenPose skeleton as a second
+input image (roughly twice the tokens). Seeds are derived from `--seed` and the crop ID, so a rerun reproduces a
+crop. `--device auto` uses Apple Metal (MPS), then CUDA, then CPU. If the Lightning LoRA
+cannot be applied to the quantized model, the run falls back to 30 steps with
+classifier-free guidance and says so.
+
+The built-in prompt (version 2, recorded in `generation.json`) was revised after the
+first Mac test, in which "sleeveless jersey with shoulder straps" produced overall-style
+straps with buckles and two of three crouched poses came out standing upright:
+
+- players wear "a classic basketball tank-top jersey with wide shoulder panels sewn to
+  the jersey, a deep scoop neckline, piped armholes and the number printed on the chest"
+  and knee-length shorts, **in exactly the colours of image 1** (no colour is named);
+  referees wear a grey striped short-sleeved shirt and black trousers;
+- each crop carries its planner pose family (`pose_family` in `crops.json`), and the
+  prompt names that stance explicitly, for example "in a low defensive stance, knees
+  deeply bent, feet wide apart, arms spread out";
+- a negative prompt (straps, buckles, overalls, backpack, square neckline, standing
+  upright, deformed hands, …) applies to the 30-step fallback; the 4-step Lightning
+  schedule runs without classifier-free guidance, so there the wording of the positive
+  prompt does the work.
+
+Version 3 follows the second Mac test (three crops, M4 Pro, Reco training in parallel):
+
+| Crop | Result | Cause | Change |
+| --- | --- | --- | --- |
+| shoot | photorealistic, kit and pose right | — | — |
+| dribble | pose right, but stiff "shoulder panels" drawn as wings and a 3D-game look | the phrase "wide shoulder panels" | phrase removed; "a real photograph, not a 3D render, not a doll" |
+| defend | a second, distorted player, rock-like shoulders, romper shorts | another player inside the crop was repainted too | everything outside the person's mask is blurred before generation; "only one person" |
+
+**Tokens.** diffusers' `QwenImageEditPlusPipeline` encodes every input image at
+1024 × 1024 (4096 tokens each). With a 768 px output and two inputs, the transformer
+processed about 10,500 tokens per step, and one crop took 12–15 minutes (714–878 s for 4
+steps, with the training running alongside). The worker now encodes the inputs at the work
+resolution and sends only the RGB crop by default: about 4,600 tokens at 768 px.
+
+**Speed.** Qwen works at most at `--resolution` pixels per side (default 768; 1024 is
+sharper and roughly 1.8× slower), then the result is scaled back to the crop size. With
+Lightning, a crop takes 4 denoising steps instead of the 40 used in the first manual
+test, which took about 26 minutes per image (40 × ~39 s at 640 × 960 with mflux, 8-bit).
+Per-step time on MPS has not been measured for this runtime yet; `generation.jsonl`
+records the seconds per crop, so the first run gives the number.
 
 `generation.json` records the model, quantization, packages, checksums and settings;
 `generation.jsonl` adds seed, steps and time per person; `qwen.log` keeps the worker
 output.
 
-Expect roughly 30 GB of memory use and one to a few minutes per person on an Apple
-M-series Mac with 48 GB; these figures come from public reports for the same model, not
-from measurements in this project. The end-to-end run on real weights has not been
-verified yet; the code path is tested with a stand-in runtime.
+On an M4 Pro (48 GB), loading the model took 195 s once per run (measured while a Reco
+Trainer training ran in parallel). The manual mflux test of the same model peaked at about
+39 GB, so do not run Qwen next to another GPU-heavy job: both slow down and the other job
+can run out of memory.
+
+**Memory.** The first Mac run of prompt v2 (M4 Pro, Reco training in parallel) finished two
+crops and then failed with "MPS backend out of memory": PyTorch kept the freed blocks of
+earlier crops in its pool. The worker now returns that cache after every crop and, on an
+out-of-memory error, frees it, retries once at the same size and then at about 84 % of the
+side length per try (down to 256 px). The resolution actually used is recorded per crop in
+`generation.jsonl`, and the progress line shows the seconds per person.
+
+## Inpaint mode (default since prompt version 4)
+
+The overnight run of prompt v3 (118 isolated people, 512 px, 63 s each on an M4 Pro)
+produced photorealistic people, but in `edit` mode Qwen redraws the whole crop as a new
+photo: eye-level camera, a larger, centred person, a new hall. Pasted back with the instance
+mask, the figures fell apart; the spill check would have rejected 117 of 118 (median
+background change 0.24).
+
+`--mode inpaint` (default) uses diffusers' `QwenImageEditInpaintPipeline` with the same
+installed model: generation starts from the render, only pixels inside `inpaint.png` may
+change, and `--strength` (default 0.75) sets how far the result may move away from the render.
+Outline, size, camera angle and kit colours therefore come from Blender. The schedule is
+stretched so that the requested 4 Lightning steps are actually run (5 scheduled steps at
+strength 0.8). The prompt describes only the person and forbids lettering except the number.
+`--mode edit` keeps the previous behaviour.
+
+Strength test on 12 crops of the night run (M4 Pro, 512 px, about 80 s per person): every
+result stays inside the silhouette and keeps the broadcast camera angle. At 0.6 bodies and
+shorts stay doll-like; at 0.75 faces, skin and fabric look real and the kit colours hold;
+at 0.9 kits start to drift (a white kit became blue, white shoes appeared). Where the 3D
+figure is bulkier than a real body (round shoulder caps, wide shorts), the result fills the
+difference with background inside the mask, visible as a faint halo.
+
+`scripts/qwen_inpaint_vergleich.py RUN` repaints 12 crops of an earlier run at strengths
+0.6, 0.75 and 0.9 and writes `RUN/vergleich/vergleich.jpg` with every result pasted back with
+the instance mask.
+
+## Overnight batch
+
+`scripts/qwen-nacht.sh [OUTPUT] [HOURS] [SCENES]` (defaults `../qwen-nacht`, 9, 60) renders
+broadcast scenes, exports 512 px crops with `export-crops --isolated` and runs
+`generate-crops --resolution 512 --time-limit` with whatever time is left; at the end
+`OUTPUT/index.html` shows each rendered person next to its result with the seconds per
+person. It keeps the Mac awake with `caffeinate`, restarts Qwen after a crash and resumes
+every step when started again.
+
+`--isolated` keeps only people whose whole crop box lies inside the frame, whose 14 body
+joints are all visible (`v = 2`) and whose crop box shows at most 3 % other players or
+referees. On broadcast renders that leaves about 2–4 people per scene. Bench players and
+spectators are background in the ID pass and are not counted; the worker blurs them.
+`generate-crops` alternates pose families, so a run stopped by `--time-limit` still covers
+every pose; the limit is not a setting, so the same folder continues with a new budget.
 
 ## Using another tool
 

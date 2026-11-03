@@ -78,14 +78,25 @@ class QwenImageEditPlusPipeline:
     def set_progress_bar_config(self, **kwargs):
         pass
     def __call__(self, image, prompt, num_inference_steps, true_cfg_scale, height, width,
-                 generator, **kwargs):
+                 generator, mask_image=None, strength=None, **kwargs):
+        assert (mask_image is not None) == self.inpaint, "mask only in inpaint mode"
+        images = image if isinstance(image, list) else [image]
         if os.environ.get("FAKE_QWEN_CRASH_AFTER") and len(open(os.environ["FAKE_QWEN_LOG"]).read().split("call")) > int(os.environ["FAKE_QWEN_CRASH_AFTER"]):
             raise SystemExit(7)
-        _log({"call": len(image), "steps": num_inference_steps, "cfg": true_cfg_scale,
-              "size": [width, height], "seed": generator.seed, "referee": "referee" in prompt})
-        out = image[0].resize((width, height))
+        if width > int(os.environ.get("FAKE_QWEN_OOM_ABOVE", "100000")):
+            _log({"oom": width})
+            raise RuntimeError("MPS backend out of memory (fake)")
+        _log({"call": len(images), "steps": num_inference_steps, "cfg": true_cfg_scale,
+              "size": [width, height], "seed": generator.seed, "referee": "referee" in prompt,
+              "inpaint": self.inpaint, "strength": strength})
+        out = images[0].resize((width, height))
         ImageDraw.Draw(out).rectangle((width // 3, height // 4, 2 * width // 3, 3 * height // 4), fill=(200, 30, 30))
         return SimpleNamespace(images=[out])
+
+QwenImageEditPlusPipeline.inpaint = False
+
+class QwenImageEditInpaintPipeline(QwenImageEditPlusPipeline):
+    inpaint = True
 """
 
 
@@ -166,9 +177,11 @@ class QwenGenerateTests(unittest.TestCase):
         self.assertIn({"scheduler": "exponential"}, entries)
         self.assertIn({"device": "cpu"}, entries)
         calls = self.calls()
-        self.assertEqual([c["steps"] for c in calls], [4, 4])
+        # Strength 0.75 stretches 4 Lightning steps to a 6-step schedule (5 of them run).
+        self.assertEqual([c["steps"] for c in calls], [6, 6])
+        self.assertEqual({(c["inpaint"], c["strength"]) for c in calls}, {(True, 0.75)})
         self.assertEqual([c["cfg"] for c in calls], [1.0, 1.0])
-        self.assertEqual(calls[0]["call"], 2)  # RGB crop and pose skeleton
+        self.assertEqual(calls[0]["call"], 1)  # the RGB crop (plus the mask)
         self.assertEqual(calls[0]["size"], [256, 256])  # at least 256, multiple of 16
         with Image.open(self.root / "gen/scene-000000-f000000-i010.png") as image:
             self.assertEqual(image.size, (100, 100))  # back at crop size
@@ -182,7 +195,7 @@ class QwenGenerateTests(unittest.TestCase):
         header = read_json(self.root / "gen/generation.json")
         self.assertEqual(header["settings"]["steps"], 4)
         # Resume: finished crops are skipped; a deleted one is regenerated with the same seed.
-        first_seed = calls[0]["seed"]
+        first_seed = next(r["seed"] for r in records if r["id"].endswith("i010"))
         (self.root / "gen/scene-000000-f000000-i010.png").unlink()
         generate_crops(
             self.root / "crops", self.root / "gen", confirm=never, progress=lambda _: None
@@ -204,7 +217,7 @@ class QwenGenerateTests(unittest.TestCase):
             generate_crops(
                 self.root / "crops", self.root / "gen", confirm=never, progress=messages.append
             )
-        self.assertEqual({c["steps"] for c in self.calls()}, {30})
+        self.assertEqual({c["steps"] for c in self.calls()}, {40})  # ceil(30 / 0.75)
         self.assertEqual({c["cfg"] for c in self.calls()}, {4.0})
         self.assertTrue(any("Lightning LoRA not usable" in m for m in messages))
 
@@ -248,6 +261,71 @@ class QwenGenerateTests(unittest.TestCase):
         self.assertEqual(calls[0][0], Path(manifest["python"]))
         self.assertIn("torchvision==0.24.1", calls[0][1])
         self.assertEqual(json.loads(manifest_path.read_text())["packages"], list(PACKAGES))
+
+    def test_work_resolution_is_capped_and_results_return_at_crop_size(self):
+        export_crops(self.source, self.root / "big-crops", size=1024)
+        generate_crops(
+            self.root / "big-crops",
+            self.root / "big-gen",
+            confirm=never,
+            resolution=512,
+            progress=lambda _: None,
+        )
+        self.assertEqual({tuple(c["size"]) for c in self.calls()}, {(512, 512)})
+        with Image.open(self.root / "big-gen/scene-000000-f000000-i010.png") as image:
+            self.assertEqual(image.size, (1024, 1024))
+        with self.assertRaises(ValueError):
+            generate_crops(self.root / "big-crops", self.root / "x", confirm=never, resolution=64)
+
+    def test_time_limit_stops_before_the_next_person(self):
+        messages: list[str] = []
+        with patch("just_a_sports_dataset_generator.generators.qwen.time.time", return_value=0.0):
+            result = generate_crops(
+                self.root / "crops",
+                self.root / "gen",
+                confirm=never,
+                time_limit=1e-9,
+                progress=messages.append,
+            )
+        self.assertEqual(result.generated, 0)
+        self.assertTrue(any("Zeitlimit" in m for m in messages))
+        # The budget is not a setting: the same folder continues without it.
+        result = generate_crops(
+            self.root / "crops", self.root / "gen", confirm=never, progress=lambda _: None
+        )
+        self.assertEqual(result.generated, 2)
+
+    def test_pose_image_is_opt_in(self):
+        generate_crops(
+            self.root / "crops",
+            self.root / "gen",
+            confirm=never,
+            mode="edit",
+            pose_image=True,
+            progress=lambda _: None,
+        )
+        self.assertEqual({c["call"] for c in self.calls()}, {2})
+        self.assertEqual({(c["inpaint"], c["steps"]) for c in self.calls()}, {(False, 4)})
+        self.assertTrue(read_json(self.root / "gen/generation.json")["settings"]["pose_image"])
+
+    def test_out_of_memory_frees_the_cache_and_retries_smaller(self):
+        export_crops(self.source, self.root / "big-crops", size=1024)
+        messages: list[str] = []
+        with patch.dict(os.environ, {"FAKE_QWEN_OOM_ABOVE": "700"}):
+            result = generate_crops(
+                self.root / "big-crops",
+                self.root / "big-gen",
+                confirm=never,
+                progress=messages.append,
+            )
+        self.assertEqual(result.generated, 2)
+        # 768 fails twice (second try after freeing the cache), then 640 fits.
+        self.assertEqual([e["oom"] for e in self.entries() if "oom" in e], [768, 768] * 2)
+        self.assertEqual({tuple(c["size"]) for c in self.calls()}, {(640, 640)})
+        records = (self.root / "big-gen/generation.jsonl").read_text().splitlines()
+        self.assertEqual({json.loads(r)["resolution"] for r in records}, {640})
+        self.assertTrue(any("Speicher voll" in m for m in messages))
+        self.assertTrue(any(m.startswith("Person 1/2 fertig") and " s)" in m for m in messages))
 
 
 if __name__ == "__main__":
