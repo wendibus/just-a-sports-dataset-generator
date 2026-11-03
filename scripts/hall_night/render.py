@@ -200,6 +200,10 @@ def choose_roster(assets, plan, rng, pilot):
 
 
 def make_layers(plan, assets, balls, cache, images, pilot, attempt):
+    if plan.get("sport") == "futsal":
+        from .futsal import make_layers as futsal_layers
+
+        return futsal_layers(plan, assets, balls, cache, images, pilot, attempt)
     rng = random.Random(seed_for(plan["seed"], f"placement-{attempt}"))
     roster = choose_roster(assets, plan, rng, pilot)
     people = []
@@ -315,12 +319,13 @@ def make_layers(plan, assets, balls, cache, images, pilot, attempt):
     return layers
 
 
-def rasterize(background, layers):
+def rasterize(background, layers, sport="basketball"):
     rgb = background.copy()
     ids = Image.new("L", rgb.size)
     draw = ImageDraw.Draw(ids)
-    for i, polygon in enumerate(HOOPS):
-        draw.polygon(polygon, fill=200 + i)
+    if sport == "basketball":
+        for i, polygon in enumerate(HOOPS):
+            draw.polygon(polygon, fill=200 + i)
     shadow = Image.new("L", rgb.size)
     d = ImageDraw.Draw(shadow)
     for layer in layers:
@@ -330,7 +335,9 @@ def rasterize(background, layers):
             if layer.identity.label != "ball"
             else layer.alpha.width * 0.48
         )
-        ry = max(2, rx * 0.15)
+        if layer.identity.label == "goal":
+            rx = layer.alpha.width * 0.43
+        ry = max(2, rx * (0.025 if layer.identity.label == "goal" else 0.15))
         d.ellipse(
             (x - rx, y - ry, x + rx, y + ry), fill=35 if layer.identity.label != "ball" else 22
         )
@@ -406,7 +413,7 @@ def preview(rgb, annotations, path):
     font = (
         ImageFont.truetype(str(font_path), 14) if font_path.exists() else ImageFont.load_default()
     )
-    colors = ((255, 70, 100), (60, 180, 255), (255, 190, 45), (70, 245, 145))
+    colors = ((255, 70, 100), (60, 180, 255), (255, 190, 45), (70, 245, 145), (195, 130, 255))
     for a in annotations:
         x, y, w, h = a.bbox_xywh
         color = colors[a.class_id]
@@ -420,6 +427,7 @@ def preview(rgb, annotations, path):
 
 
 def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
+    sport = config.get("sport", "basketball")
     destination = root / "renders" / plan["id"]
     cache = Path(config.get("cache", root / "cache"))
     if (destination / "done.json").exists():
@@ -436,7 +444,7 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
         background = raw.convert("RGB")
     for attempt in range(35):
         layers = make_layers(plan, assets, balls, cache, images, pilot, attempt)
-        rgb, ids, ratios = rasterize(background, layers)
+        rgb, ids, ratios = rasterize(background, layers, sport)
         person_ratios = [ratio for ident, ratio in ratios.items() if 10 <= ident < 40]
         if not all(r >= 0.08 for r in ratios.values()):
             continue
@@ -450,7 +458,7 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
     else:
         raise ValueError(f"Could not place valid, partially occluded objects for {plan['id']}")
     objects = tuple(l.identity for l in layers) + tuple(
-        ObjectIdentity(200 + i, 3, "hoop") for i in range(5)
+        ObjectIdentity(200 + i, 3, "hoop") for i in range(5) if sport == "basketball"
     )
     rng = random.Random(seed_for(plan["seed"], "views"))
     shots = ("full", "half", "medium", "tight")
@@ -461,7 +469,7 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
     previews = root / "previews"
     previews.mkdir(exist_ok=True)
     with new_directory(destination) as stage:
-        for frame_index, shot in enumerate((shot0, shot1)):
+        for frame_index, shot in enumerate((shot0, shot1)[: plan.get("frame_count", 2)]):
             box, actual_shot = select_crop(ids, layers, plan, rng, shot)
             frame_rgb = rgb.crop(box)
             frame_ids = ids.crop(box)
@@ -473,14 +481,14 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
             # Global sensor/exposure augmentation, after compositing the full scene.
             frame_rgb = ImageEnhance.Brightness(frame_rgb).enhance(rng.uniform(0.94, 1.06))
             frame_rgb = ImageEnhance.Color(frame_rgb).enhance(rng.uniform(0.95, 1.04))
-            annotations = visible_annotations(*size, frame_ids.tobytes(), objects, "basketball")
+            annotations = visible_annotations(*size, frame_ids.tobytes(), objects, sport)
             if not valid_ball_count(sum(a.label == "ball" for a in annotations), plan["ball_mode"]):
                 # Retain native crop resolution when a very small visible ball would
                 # otherwise disappear. Never leave an unlabelled visible ball in RGB.
                 frame_rgb = rgb.crop(box)
                 frame_ids = ids.crop(box)
                 size = frame_rgb.size
-                annotations = visible_annotations(*size, frame_ids.tobytes(), objects, "basketball")
+                annotations = visible_annotations(*size, frame_ids.tobytes(), objects, sport)
                 if not valid_ball_count(
                     sum(a.label == "ball" for a in annotations), plan["ball_mode"]
                 ):
@@ -549,13 +557,16 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
                     {
                         "id": l.identity.instance_id,
                         "asset": l.source,
+                        "label": l.identity.label,
                         "ground_pixel": list(l.ground),
                         "position_pixel": list(l.position),
                         **l.metadata,
                     }
                     for l in layers
                 ],
-                "annotation_semantics": "Photo cutout alpha and crop clipping; background hoops use manual board/rim/net envelopes.",
+                "annotation_semantics": "Visible alpha pixels after depth composition and crop clipping; Futsal goal net holes retain background pixels."
+                if sport == "futsal"
+                else "Photo cutout alpha and crop clipping; background hoops use manual board/rim/net envelopes.",
                 "scale_calibration": {
                     "estimated_camera_height_m": 2.4,
                     "method": "foot-point distance from the rectified image horizon",
@@ -575,12 +586,14 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
                     "renderer": "local.hall-photo-composite",
                     "renderer_version": "1.0",
                     "job_id": plan["id"] + f"-v{frame['frame_index']}",
-                    "sport": "basketball",
+                    "sport": sport,
                     "seed": plan["seed"],
-                    "labels": list(labels_for_sport("basketball")),
+                    "labels": list(labels_for_sport(sport)),
                     "resolution": {"width": size[0], "height": size[1]},
                     "requested_annotations": ["bounding_boxes", "instance_masks"],
-                    "annotation_semantics": "Visible photo-alpha pixels; manually annotated background hoops. No original Blender human labels/keypoints reused.",
+                    "annotation_semantics": "Visible photo-alpha pixels and procedural goal alpha; no original Blender human labels/keypoints reused."
+                    if sport == "futsal"
+                    else "Visible photo-alpha pixels; manually annotated background hoops. No original Blender human labels/keypoints reused.",
                     "assets": [
                         {"id": "hall-background", "sha256": config["background_sha256"]},
                         *[

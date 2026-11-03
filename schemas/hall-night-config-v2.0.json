@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hall night runner configuration v2.0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "seed",
+    "count",
+    "max_hours",
+    "resolution",
+    "background",
+    "background_sha256",
+    "source_crops",
+    "ball_reference",
+    "referee_reference",
+    "qwen_python",
+    "matte_python",
+    "matte_model",
+    "model",
+    "generator_root",
+    "output_width",
+    "gender_weights",
+    "ball_weights",
+    "sport",
+    "goals"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 100000
+    },
+    "max_hours": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 48
+    },
+    "resolution": {
+      "enum": [
+        512,
+        640,
+        768
+      ]
+    },
+    "background": {
+      "type": "string",
+      "minLength": 1
+    },
+    "background_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_crops": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ball_reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "referee_reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "qwen_python": {
+      "type": "string",
+      "minLength": 1
+    },
+    "matte_python": {
+      "type": "string",
+      "minLength": 1
+    },
+    "matte_model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generator_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "base_dir",
+        "gguf",
+        "lora"
+      ],
+      "properties": {
+        "base_dir": {
+          "type": "string"
+        },
+        "gguf": {
+          "type": "string"
+        },
+        "lora": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "model_hashes": {
+      "type": "object",
+      "properties": {
+        "gguf": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "lora": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "model_request_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "output_width": {
+      "type": "integer",
+      "minimum": 640,
+      "maximum": 3200
+    },
+    "gender_weights": {
+      "type": "object",
+      "required": [
+        "men",
+        "women",
+        "mixed"
+      ],
+      "properties": {
+        "men": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "women": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mixed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ball_weights": {
+      "type": "object",
+      "required": [
+        "single",
+        "multi",
+        "none"
+      ],
+      "properties": {
+        "single": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "multi": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "none": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "note": {
+      "type": "string"
+    },
+    "sport": {
+      "const": "futsal"
+    },
+    "goals": {
+      "type": "string",
+      "minLength": 1
+    },
+    "background_cleanup": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false
+}

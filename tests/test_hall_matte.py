@@ -19,7 +19,8 @@ class HallMatteTests(unittest.TestCase):
             root = Path(folder)
             (root / "photos").mkdir()
             (root / "masks").mkdir()
-            for extra in (False, True):
+            for variant in ("clean", "orange", "white"):
+                extra = variant != "clean"
                 image = Image.new("RGB", (640, 640), (190, 190, 190))
                 mask = Image.new("L", (640, 640))
                 draw = ImageDraw.Draw(image)
@@ -37,11 +38,14 @@ class HallMatteTests(unittest.TestCase):
                 draw.ellipse((395, 180, 414, 197), fill=(130, 75, 38))
                 if extra:
                     draw.ellipse(
-                        (407, 170, 467, 230), fill=(210, 110, 35), outline=(45, 30, 20), width=3
+                        (407, 170, 467, 230),
+                        fill=(240, 240, 240) if variant == "white" else (210, 110, 35),
+                        outline=(45, 30, 20),
+                        width=3,
                     )
                     draw.line((417, 180, 457, 220), fill=(45, 30, 20), width=2)
                     alpha.ellipse((407, 170, 467, 230), fill=255)
-                identity = "with-ball" if extra else "no-ball"
+                identity = variant
                 image.save(root / "photos" / (identity + ".png"))
                 mask.save(root / "masks" / (identity + ".png"))
             subprocess.run(
@@ -49,17 +53,21 @@ class HallMatteTests(unittest.TestCase):
                     MATTE_PYTHON,
                     str(Path(__file__).resolve().parents[1] / "scripts/hall_night/matte_checks.py"),
                     str(root),
+                    "--sport",
+                    "futsal",
                     "--ids",
-                    "no-ball",
-                    "with-ball",
+                    "clean",
+                    "orange",
+                    "white",
                 ],
                 check=True,
                 capture_output=True,
                 timeout=30,
             )
             report = json.loads((root / "matte-checks.json").read_text())
-            self.assertFalse(report["no-ball"]["possible_extra_balls"])
-            self.assertTrue(report["with-ball"]["possible_extra_balls"])
+            self.assertFalse(report["clean"]["possible_extra_balls"])
+            self.assertTrue(report["orange"]["possible_extra_balls"])
+            self.assertTrue(report["white"]["possible_extra_balls"])
             for identity in report:
                 with Image.open(root / "masks" / (identity + ".clean.png")) as mask:
                     self.assertGreater(mask.getbbox()[3], 550)

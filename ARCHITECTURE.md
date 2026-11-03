@@ -21,11 +21,13 @@ RF-DETR is the target detector and training framework, owned by Reco Trainer. Th
 | Blender basketball renderer, broadcast and `reco_panorama` cameras | implemented, procedural athletes |
 | Visible-pixel annotations, COCO for RF-DETR, provenance | implemented, Reco importer tested in CI |
 | OpenPose keypoints, person crops, label-preserving paste-back | implemented |
-| Local Qwen-Image-Edit-2511 repaint with consent-based install | implemented; not yet run on real weights |
+| Local Qwen-Image-Edit-2511 repaint with consent-based install | implemented; local real-weight photographic trials performed |
 | Mac starter (dialogs, progress page, preview) | implemented |
 | Plugin model (section 3) | metadata contracts only; no discovery, isolation or signatures |
 | Secure updater (section 5) | specification only, not implemented |
-| Football, futsal and other sports | taxonomy only, no renderer |
+| Photographic basketball hall batch | implemented, local Qwen/BiRefNet cutouts, grouped COCO |
+| Photographic Futsal hall batch | experimental adapter; exact odd frame budgets, goalkeepers, standing goals; see docs/FUTSAL_HALL.md |
+| Football and other full 3D sport renderers | planned; taxonomy available |
 
 Sections 3 and 5 describe the target design so that later work keeps the same contracts;
 they are not a description of shipped behaviour.

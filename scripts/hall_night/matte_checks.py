@@ -11,6 +11,7 @@ import numpy as np
 p = argparse.ArgumentParser()
 p.add_argument("root", type=Path)
 p.add_argument("--ids", nargs="+", required=True)
+p.add_argument("--sport", choices=("basketball", "futsal"), default="basketball")
 a = p.parse_args()
 records = {}
 for identity in a.ids:
@@ -54,7 +55,12 @@ for identity in a.ids:
                     & (hsv[:, :, 2] > 65)
                 )
                 fraction = float((brown_orange & region).sum() / area)
-                if fraction > 0.68 and area > 0.9 * np.pi * (0.8 * r) ** 2:
+                white_pattern = (hsv[:, :, 1] < 65) & (hsv[:, :, 2] > 145)
+                white_fraction = float((white_pattern & region).sum() / area)
+                # Futsal balls are mostly white/patterned; require an isolated
+                # circular silhouette below the head, never classify skin or kit.
+                looks_like_ball = fraction > 0.68 or (a.sport == "futsal" and white_fraction > 0.40)
+                if looks_like_ball and area > 0.9 * np.pi * (0.8 * r) ** 2:
                     suspicious.append(
                         [round(float(cx), 1), round(float(cy), 1), round(float(r), 1)]
                     )

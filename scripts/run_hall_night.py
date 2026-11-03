@@ -26,6 +26,18 @@ from hall_night.render import make_plans, render_scene
 from PIL import Image
 
 
+def sport_adapter(config):
+    if config.get("sport") == "futsal":
+        from hall_night import futsal
+
+        return futsal
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        asset_plan=asset_plan, prompt_for=prompt_for, build_balls=build_balls, make_plans=make_plans
+    )
+
+
 @contextlib.contextmanager
 def lock(path):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -103,6 +115,8 @@ def dashboard(root, state):
         if complete
         else ""
     )
+    if (root / "Referenzen.html").exists():
+        links += '<p><a href="Referenzen.html">Schiedsrichter- und Ballvorlagen</a></p>'
     if (root / "pilot/index.html").exists():
         links += '<p><a href="pilot/index.html">Pilotbilder ansehen</a></p>'
     refresh = "" if complete else '<meta http-equiv="refresh" content="30">'
@@ -115,12 +129,20 @@ def dashboard(root, state):
 def preflight(root, config):
     from jsonschema import Draft202012Validator
 
-    schema = read(Path(__file__).resolve().parents[1] / "schemas/hall-night-config-v1.0.json")
+    version = config["schema_version"]
+    schema = read(
+        Path(__file__).resolve().parents[1] / f"schemas/hall-night-config-v{version}.json"
+    )
     Draft202012Validator(schema).validate(config)
-    make_plans(config["count"], config["seed"], config["gender_weights"], config["ball_weights"])
+    planner = sport_adapter(config).make_plans
+    planner(config["count"], config["seed"], config["gender_weights"], config["ball_weights"])
     from just_a_sports_dataset_generator.core import labels_for_sport
 
-    if list(labels_for_sport("basketball")) != ["ball", "player", "referee", "hoop"]:
+    if list(labels_for_sport(config.get("sport", "basketball"))) != (
+        ["ball", "player", "goalkeeper", "referee", "goal"]
+        if config.get("sport") == "futsal"
+        else ["ball", "player", "referee", "hoop"]
+    ):
         raise ValueError("Reco taxonomy changed")
     for key in (
         "background",
@@ -183,6 +205,10 @@ def preflight(root, config):
         "render_sha256": sha(Path(__file__).with_name("hall_night") / "render.py"),
         "export_sha256": sha(Path(__file__).with_name("hall_night") / "export.py"),
         "matte_checks_sha256": sha(Path(__file__).with_name("hall_night") / "matte_checks.py"),
+        "futsal_adapter_sha256": sha(Path(__file__).with_name("hall_night") / "futsal.py")
+        if config.get("sport") == "futsal"
+        else None,
+        "goals": read(Path(config["goals"])) if config.get("sport") == "futsal" else None,
         "photo_worker_sha256": sha(Path(__file__).with_name("hall_night") / "photo_worker.py"),
     }
     fingerprint = root / "run-fingerprint.json"
@@ -196,13 +222,27 @@ def preflight(root, config):
 def generate_assets(root, config, deadline, pilot=False):
     cache = root / "cache"
     cache.mkdir(exist_ok=True)
-    plan = asset_plan(config["seed"])
+    adapter = sport_adapter(config)
+    plan = adapter.asset_plan(config["seed"])
     prepare_references(config, cache, plan)
     for a in plan:
-        a["prompt"] = prompt_for(a)
+        a["prompt"] = adapter.prompt_for(a)
     write(cache / "asset-plan.json", {"schema_version": "1.0", "assets": plan})
     if pilot:
         wanted = {"p-woman-red-00", "p-woman-yellow-01", "p-man-red-02", "p-man-yellow-00", "r-04"}
+        if config.get("sport") == "futsal":
+            wanted = {
+                "p-woman-red-00",
+                "p-woman-yellow-01",
+                "p-man-red-02",
+                "p-man-yellow-00",
+                "k-woman-green-00",
+                "k-woman-blue-00",
+                "k-man-green-00",
+                "k-man-blue-00",
+                "r-04",
+                "r-05",
+            }
         selected = [a for a in plan if a["id"] in wanted]
     else:
         selected = plan
@@ -299,26 +339,27 @@ def generate_assets(root, config, deadline, pilot=False):
             )
             attempts[identity] = attempt + 1
         write(cache / "repair-attempts.json", attempts)
-    build_balls(config, cache)
+    adapter.build_balls(config, cache)
     return [a for a in accepted if not pilot or a["id"] in wanted]
 
 
 def render_all(root, config, plans, assets, deadline, pilot=False):
     cache = Path(config.get("cache", root / "cache"))
     balls = read(cache / "balls.json")["assets"]
-    for asset in assets + balls:
+    goals = read(Path(config["goals"]))["assets"] if config.get("sport") == "futsal" else []
+    for asset in assets + balls + goals:
         if sha(asset_path(cache, asset["file"])) != asset["sha256"]:
             raise ValueError("Cutout changed since asset QC")
     write(
         root / "scene-plan.json",
         {
             "schema_version": "1.0",
-            "images": len(plans) * 2,
+            "images": sum(p.get("frame_count", 2) for p in plans),
             "scenes": plans,
             "pilot_preview_only": pilot,
         },
     )
-    snapshot = {"assets": assets, "balls": balls}
+    snapshot = {"assets": assets, "balls": balls, **({"goals": goals} if goals else {})}
     fingerprint = root / "library-fingerprint.json"
     if fingerprint.exists() and read(fingerprint) != snapshot:
         raise ValueError(
@@ -331,13 +372,16 @@ def render_all(root, config, plans, assets, deadline, pilot=False):
         stats = render_scene(config, root, plan, assets, balls, images, pilot, deadline)
         statistics.extend(stats)
         if index % 10 == 0 or index == len(plans) - 1:
-            print(f"Rendered {(index + 1) * 2}/{len(plans) * 2} images", flush=True)
+            print(
+                f"Rendered {len(statistics)}/{sum(p.get('frame_count', 2) for p in plans)} images",
+                flush=True,
+            )
             dashboard(
                 root,
                 {
                     "status": "rendering",
-                    "images": (index + 1) * 2,
-                    "requested": len(plans) * 2,
+                    "images": len(statistics),
+                    "requested": sum(p.get("frame_count", 2) for p in plans),
                     "message": "Szenen und sichtbare Labels werden geprüft",
                 },
             )
@@ -359,6 +403,10 @@ def main():
     root = args.root.resolve()
     config = read(root / "config.json")
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
+    if config.get("sport") == "futsal" and args.stage != "verify":
+        from hall_night.resources import wait_for_other_runs
+
+        wait_for_other_runs(root)
     started = time.time()
     deadline = started + 3600 * (args.hours if args.hours is not None else config["max_hours"])
     if deadline <= started:
@@ -367,6 +415,10 @@ def main():
         if args.stage == "verify":
             verify(root / "dataset")
             return
+        if config.get("background_cleanup"):
+            from hall_night.resources import finish_background
+
+            finish_background(root, config, invoke, dashboard)
         preflight(root, config)
         dashboard(
             root,
@@ -398,6 +450,9 @@ def main():
                 destination.mkdir(exist_ok=True)
                 settings = {**config, "cache": str(root / "cache")}
                 plans = make_plans(12, config["seed"])
+                if config.get("sport") == "futsal":
+                    for plan in plans:
+                        plan["sport"] = "futsal"
                 # Guarantee all three composition types are present in the visual pilot.
                 for i, plan in enumerate(plans):
                     plan["gender_mode"] = ("women", "men", "mixed")[i % 3]
@@ -426,7 +481,7 @@ def main():
                     },
                 )
                 return
-            plans = make_plans(
+            plans = sport_adapter(config).make_plans(
                 config["count"], config["seed"], config["gender_weights"], config["ball_weights"]
             )
             render_all(root, config, plans, assets, deadline)
@@ -461,7 +516,9 @@ def main():
                 root,
                 {
                     "status": "interrupted" if isinstance(exc, KeyboardInterrupt) else "incomplete",
-                    "images": 2 * len(list((root / "renders").glob("*/done.json"))),
+                    "images": sum(
+                        len(read(p)["statistics"]) for p in (root / "renders").glob("*/done.json")
+                    ),
                     "requested": config["count"],
                     "message": str(exc) or "Unterbrochen – derselbe Befehl setzt fort",
                 },

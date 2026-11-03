@@ -149,7 +149,8 @@ def prepare_references(config, root: Path, plan):
         options = [
             c
             for c in index["crops"]
-            if c["label"] == asset["label"] and c.get("pose_family") == asset["pose"]
+            if c["label"] == asset.get("reference_label", asset["label"])
+            and c.get("pose_family") == asset.get("reference_pose", asset["pose"])
         ]
         if not options:
             raise ValueError(f"No pose reference for {asset['id']}")
@@ -251,6 +252,8 @@ def finalize_assets(config, root: Path, plan):
             config["matte_python"],
             str(Path(__file__).with_name("matte_checks.py")),
             str(root),
+            "--sport",
+            config.get("sport", "basketball"),
             "--ids",
             *ids,
         ],
@@ -307,14 +310,15 @@ def finalize_assets(config, root: Path, plan):
     write(
         root / "library.json",
         {
-            "schema_version": "1.0",
+            "schema_version": "2.0" if config.get("sport") == "futsal" else "1.0",
             "assets": accepted,
             "rejected": rejected,
             "generation": "Qwen-Image-Edit-2511 Q4_K_M + Lightning (Apache-2.0); BiRefNet (MIT), local",
             "traits": "Prompted attributes, not independently inferred demographic ground truth",
         },
     )
-    validate("hall-photo-library-v1.0.json", read(root / "library.json"))
+    version = "2.0" if config.get("sport") == "futsal" else "1.0"
+    validate(f"hall-photo-library-v{version}.json", read(root / "library.json"))
     contact_sheet(root, accepted)
     return accepted, rejected
 

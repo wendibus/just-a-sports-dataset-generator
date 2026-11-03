@@ -25,9 +25,10 @@ def export_and_verify(root: Path, config, plans, pilot=False):
         return target
     schema = read(Path(__file__).resolve().parents[2] / "schemas/scene-v2.0.json")
     validator = Draft202012Validator(schema)
-    labels = labels_for_sport("basketball")
+    sport = config.get("sport", "basketball")
+    labels = labels_for_sport(sport)
     categories = [
-        {"id": i + 1, "name": name, "supercategory": "basketball"} for i, name in enumerate(labels)
+        {"id": i + 1, "name": name, "supercategory": sport} for i, name in enumerate(labels)
     ]
     data = {
         split: {
@@ -49,7 +50,7 @@ def export_and_verify(root: Path, config, plans, pilot=False):
     shots = Counter()
     partial_people = partial_balls = 0
     image_hashes = {}
-    expected = len(plans) * 2
+    expected = sum(p.get("frame_count", 2) for p in plans)
     with new_directory(target) as stage:
         for split in data:
             (stage / "coco" / ("valid" if split == "val" else split)).mkdir(parents=True)
@@ -61,10 +62,15 @@ def export_and_verify(root: Path, config, plans, pilot=False):
                 if sha(folder / filename) != digest:
                     raise ValueError("Source changed since rendering")
             metadata = read(folder / "view-metadata.json")
-            assets = {a["asset"] for a in metadata["layers"] if not a["asset"].startswith("ball-")}
+            assets = {
+                a["asset"]
+                for a in metadata["layers"]
+                if a.get("label") in ("player", "goalkeeper", "referee")
+                or ("label" not in a and not a["asset"].startswith("ball-"))
+            }
             split = plan["split"]
             assets_by_split[split].update(assets)
-            for i in range(2):
+            for i in range(plan.get("frame_count", 2)):
                 path = folder / f"scene-{i:03d}.json"
                 validator.validate(read(path))
                 scene = load_scene(path)
@@ -132,7 +138,8 @@ def export_and_verify(root: Path, config, plans, pilot=False):
         write(
             stage / "manifest.json",
             {
-                "schema_version": "1.0",
+                "schema_version": "2.0" if sport == "futsal" else "1.0",
+                **({"sport": sport} if sport == "futsal" else {}),
                 "format": "hall-photo-coco",
                 "images": image_id,
                 "annotations": annotation_id,
@@ -151,7 +158,9 @@ def export_and_verify(root: Path, config, plans, pilot=False):
                     "One hall only; real held-out footage required for quality evaluation",
                     "Photographic 2.5D composites, not physical simulation",
                     "Requested demographics and poses need visual asset review",
-                    "Static hoop envelopes are manually traced; photographic net holes are approximate",
+                    "Goal masks follow procedural post/net alpha; hall calibration is estimated"
+                    if sport == "futsal"
+                    else "Static hoop envelopes are manually traced; photographic net holes are approximate",
                     "Reco imports boxes and rebuilds its splits; retain this export for grouped evaluation",
                 ],
                 "rights": "Source hall and ball reference sheets supplied by the user; no redistribution rights asserted.",
@@ -162,14 +171,15 @@ def export_and_verify(root: Path, config, plans, pilot=False):
 
 
 def verify(dataset: Path):
-    labels = list(labels_for_sport("basketball"))
+    manifest = read(dataset / "manifest.json")
+    sport = manifest.get("sport", "basketball")
+    labels = list(labels_for_sport(sport))
     total_images = total_annotations = 0
     for split in ("train", "valid", "test"):
         folder = dataset / "coco" / split
         coco = read(folder / "_annotations.coco.json")
         assert coco["categories"] == [
-            {"id": i + 1, "name": name, "supercategory": "basketball"}
-            for i, name in enumerate(labels)
+            {"id": i + 1, "name": name, "supercategory": sport} for i, name in enumerate(labels)
         ]
         grouped = {}
         for ann in coco["annotations"]:
@@ -192,7 +202,7 @@ def verify(dataset: Path):
                 area = int(mask.sum())
                 bbox = [int(v) for v in coco_mask.toBbox(rle)]
                 assert ann["area"] == area and ann["bbox"] == bbox
-                assert 1 <= ann["category_id"] <= 4
+                assert 1 <= ann["category_id"] <= len(labels)
                 total_annotations += 1
             assert actual_ids == expected_ids, "Unlabelled visible object ID"
             total_images += 1
@@ -200,7 +210,7 @@ def verify(dataset: Path):
                 print(f"Mask verification: {total_images} images", flush=True)
         print("Verified", split, len(coco["images"]), "images", flush=True)
     manifest = read(dataset / "manifest.json")
-    validate("hall-photo-export-v1.0.json", manifest)
+    validate(f"hall-photo-export-v{manifest['schema_version']}.json", manifest)
     assert total_images == manifest["images"] and total_annotations == manifest["annotations"]
     write(
         dataset / "verification.json",
@@ -212,7 +222,7 @@ def verify(dataset: Path):
                 "Every exported RLE equals its final instance mask",
                 "Every bounding box and area match its mask",
                 "Every visible ID is labelled",
-                "Reco basketball class ordering and one-based COCO IDs",
+                f"Reco {sport} class ordering and one-based COCO IDs",
                 "Every exported RGB checksum matches the render",
             ],
             "manifest_sha256": sha(dataset / "manifest.json"),
