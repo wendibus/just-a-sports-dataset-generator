@@ -18,6 +18,7 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -143,19 +144,75 @@ def _isolated(
     return crowded <= OTHER_PEOPLE_LIMIT * (right - left) * (bottom - top)
 
 
-def _pose_families(scene: Scene) -> dict[int, str]:
-    """Pose family per instance from the planner's layout.json, if the scene has one."""
+COLOR_NAMES = (
+    ("white", (0.95, 0.95, 0.93)),
+    ("light grey", (0.75, 0.76, 0.77)),
+    ("grey", (0.55, 0.56, 0.58)),
+    ("black", (0.08, 0.08, 0.09)),
+    ("red", (0.9, 0.28, 0.18)),
+    ("orange", (0.95, 0.5, 0.12)),
+    ("yellow", (0.96, 0.84, 0.15)),
+    ("neon yellow", (0.88, 0.95, 0.15)),
+    ("green", (0.15, 0.6, 0.25)),
+    ("turquoise", (0.2, 0.75, 0.78)),
+    ("light blue", (0.25, 0.65, 0.92)),
+    ("blue", (0.1, 0.3, 0.8)),
+    ("navy blue", (0.08, 0.12, 0.35)),
+    ("purple", (0.5, 0.2, 0.6)),
+    ("pink", (0.9, 0.45, 0.7)),
+)
+
+
+def color_name(linear_rgb: object) -> str | None:
+    """Plain colour word for a linear-RGB colour from the layout (for generator prompts)."""
+    if not isinstance(linear_rgb, list):
+        return None
+    values = sequence(cast(object, linear_rgb))
+    if len(values) != 3 or any(type(v) not in (int, float) for v in values):
+        return None
+    srgb = [
+        12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+        for c in (float(v) for v in values)  # pyright: ignore[reportArgumentType]
+    ]
+    return min(
+        COLOR_NAMES,
+        key=lambda item: sum((a - b) ** 2 for a, b in zip(srgb, item[1], strict=True)),
+    )[0]
+
+
+def _kit_description(athlete: dict[str, object]) -> str | None:
+    """'white' for a player kit; shirt, sleeves and lower garment for a referee kit."""
+    referee = athlete.get("referee_kit")
+    if isinstance(referee, dict):
+        kit = mapping(cast(object, referee))
+        shirt, sleeves = color_name(kit.get("shirt")), color_name(kit.get("sleeves"))
+        lower = color_name(kit.get("lower_color"))
+        if not (shirt and sleeves and lower):
+            return None
+        if kit.get("pattern") == "vertical_stripes":
+            top = f"a {shirt} shirt with thin {color_name(kit.get('accent')) or 'black'} vertical stripes"
+        else:
+            top = f"a plain {shirt} short-sleeved shirt"
+            if sleeves != shirt:
+                top += f" with {sleeves} sleeves"
+        garment = "long trousers" if kit.get("lower") == "trousers" else "shorts"
+        return f"{top} and {lower} {garment}"
+    return color_name(athlete.get("kit"))
+
+
+def _pose_families(scene: Scene) -> dict[int, tuple[str | None, str | None]]:
+    """Pose family and kit description per instance from layout.json, if the scene has one."""
     path = scene.path.parent / "layout.json"
     if not path.is_file() or path.stat().st_size > 32 * 1024 * 1024:
         return {}
     athletes = mapping(json.loads(path.read_text(encoding="utf-8"))).get("athletes", [])
-    families: dict[int, str] = {}
+    result: dict[int, tuple[str | None, str | None]] = {}
     for raw in sequence(athletes):
         athlete = mapping(raw)
         family = mapping(athlete.get("pose", {})).get("family")
-        if isinstance(family, str) and family.isidentifier():
-            families[integer(athlete.get("instance_id"), 1)] = family
-    return families
+        name = family if isinstance(family, str) and family.isidentifier() else None
+        result[integer(athlete.get("instance_id"), 1)] = (name, _kit_description(athlete))
+    return result
 
 
 def draw_openpose(points: list[list[float]], size: int) -> Image.Image:
@@ -267,7 +324,8 @@ def export_crops(
                             "frame_index": frame.index,
                             "instance_id": identity,
                             "label": annotation.label,
-                            "pose_family": families.get(annotation.instance_id),
+                            "pose_family": families.get(annotation.instance_id, (None, None))[0],
+                            "kit": families.get(annotation.instance_id, (None, None))[1],
                             "source_rgb": str(frame.rgb.relative_to(source)),
                             "bbox_xywh": list(annotation.bbox_xywh),
                             "visible_area": annotation.visible_area,

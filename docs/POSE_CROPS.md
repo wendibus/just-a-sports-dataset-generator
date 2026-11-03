@@ -135,6 +135,12 @@ stretched so that the requested 4 Lightning steps are actually run (5 scheduled 
 strength 0.8). The prompt describes only the person and forbids lettering except the number.
 `--mode edit` keeps the previous behaviour.
 
+Prompt version 5 names the kit colours. `export-crops` adds `kit` to every crop, read
+from `layout.json`: a colour word for players ("white") and the planned referee kit
+("a plain grey short-sleeved shirt with black sleeves and black long trousers"). At
+strength 0.9, without names, white kits had come out black or blue and grey referee
+shirts had become striped.
+
 Strength test on 12 crops of the night run (M4 Pro, 512 px, about 80 s per person): every
 result stays inside the silhouette and keeps the broadcast camera angle. At 0.6 bodies and
 shorts stay doll-like; at 0.75 faces, skin and fabric look real and the kit colours hold;

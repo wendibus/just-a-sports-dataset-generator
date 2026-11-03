@@ -30,7 +30,7 @@ from .qwen_setup import (
 )
 
 WORKER = Path(__file__).with_name("qwen_worker.py")
-PROMPT_VERSION = 4
+PROMPT_VERSION = 5
 """Must match qwen_worker.PROMPT_VERSION; part of a run's fingerprint so runs never mix."""
 
 

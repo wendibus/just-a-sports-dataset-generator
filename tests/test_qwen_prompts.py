@@ -62,6 +62,10 @@ class PromptTests(unittest.TestCase):
         self.assertIn("no other lettering", prompt)
         self.assertIn("running mid-stride", prompt)
         self.assertIn("referee shirt", worker.inpaint_prompt({"label": "referee"}))
+        named = worker.inpaint_prompt({"label": "player", "kit": "white"})
+        self.assertIn("a white sleeveless basketball jersey and white shorts", named)
+        kit = "a plain grey short-sleeved shirt with black sleeves and black long trousers"
+        self.assertIn(kit, worker.inpaint_prompt({"label": "referee", "kit": kit}))
 
     def test_condition_size_follows_the_work_resolution(self):
         worker.set_condition_size(512)  # no diffusers here: must be a no-op, not an error

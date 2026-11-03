@@ -194,6 +194,13 @@
               "null"
             ],
             "description": "Planner pose family (e.g. dribble, defend) when the scene has a layout.json; used for generator prompts."
+          },
+          "kit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Plain-language kit colours from layout.json, for generator prompts."
           }
         }
       }
