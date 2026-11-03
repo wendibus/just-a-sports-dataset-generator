@@ -155,6 +155,34 @@ class CompositeTests(unittest.TestCase):
             self.assertEqual(result.applied, 1)
             self.assertEqual(read_json(root / "ok/out/composite.json")["items"][0]["iou"], 1.0)
 
+    def test_missing_foreground_rejects_without_changing_labels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, crops = setup(root)
+            generated = painted(crops, "mask", f"{CROP_ID}.png", root / "generated")
+            masks = root / "silhouettes"
+            masks.mkdir()
+            with Image.open(crops / f"scene-000000/{CROP_ID}.mask.png") as raw:
+                mask = raw.convert("L")
+            mask.paste(0, (0, mask.height // 2, mask.width, mask.height))
+            mask.save(masks / f"{CROP_ID}.png")
+            result = composite_crops(
+                source, crops, generated, root / "out", silhouettes=masks, min_iou=0
+            )
+            self.assertEqual((result.applied, result.rejected), (0, 1))
+            report = read_json(root / "out/composite.json")
+            Draft202012Validator(read_json(ROOT / "schemas/composite-report-v1.1.json")).validate(
+                report
+            )
+            self.assertEqual(report["items"][0]["reason"], "missing foreground")
+            self.assertEqual(
+                ids(source / "scene-000000/ids.png"), ids(root / "out/scene-000000/ids.png")
+            )
+            self.assertEqual(
+                pixels(source / "scene-000000/frame.png"),
+                pixels(root / "out/scene-000000/frame.png"),
+            )
+
     def test_missing_ambiguous_and_mismatched_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

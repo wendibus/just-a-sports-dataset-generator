@@ -229,3 +229,90 @@ check is a filter on generated pixels, never a source of labels.
 - Upscaling a 40-pixel panorama player to 1024 pixels gives the generator a blurry
   input; that is intended, since it repaints the person, but the result must be
   downscaled for the dataset.
+
+## Independent foreground review and controlled strength comparison
+
+`scripts/qwen_quality_compare.py RUN --output NEW_FOLDER --ids ID1 ID2 ID3
+--strengths 0.65 0.75 0.85 --review-python /path/to/foreground-env/bin/python
+--foreground-model /path/to/local/BiRefNet` compares the same source crops with
+fixed seed 0 and 512 px output. Add `--baseline RUN/generated-inpaint-0.9` to include
+an existing 0.9 run without regenerating it. Use a new output folder when settings
+change. Matching comparisons resume completed generation and foreground extraction.
+Qwen must already be installed; the comparison declines any installation request.
+BiRefNet must be explicitly installed separately (MIT, local code and safetensors).
+There are no automatic model downloads. The foreground helper uses CPU so it does
+not keep another model in accelerator memory next to Qwen.
+
+The comparison writes source/result previews and `quality-report.json`. Predicted
+foreground masks are filters only; they never replace Blender IDs. `rejected` means
+numerical checks failed. `needs_visual_review` means a human must still review skin,
+uniforms, anatomy, pose, ball contact and consistency at the original frame size.
+
+When `composite-crops --silhouettes DIR` is supplied, the compositor additionally
+requires at least 90% foreground coverage and at least 55% coverage in every populated
+local window of the original silhouette, allowing two pixels of boundary tolerance.
+Overlapping local windows catch missing hands/feet that whole-person IoU can hide.
+These are conservative starting thresholds, not calibrated anatomy detection.
+Foreground estimation may reject a usable image, especially with a touching ball or
+occlusion. A pass does not establish photorealism or training value.
+
+Reports with silhouette checks use `composite-report-v1.1.json`, adding foreground
+coverage, minimum local coverage, and the supplied silhouette's SHA-256. Runs without
+silhouettes keep report 1.0 for compatibility. Rejected replacements leave RGB and
+all original masks/annotations untouched. The original model/source provenance and
+labels remain unchanged. An old `applied` status alone is not quality approval.
+
+To audit an existing batch and produce a fresh, conservatively filtered render:
+
+```sh
+python scripts/review_generated.py /path/to/run \
+  --generated /path/to/run/generated-inpaint-0.9 \
+  --output /path/to/run/reviewed-batch \
+  --review-python /path/to/foreground-env/bin/python \
+  --foreground-model /path/to/local/BiRefNet
+```
+
+The script writes predicted masks, then invokes `composite-crops` with those masks
+required. Missing or ambiguous silhouettes reject a replacement; missing generated
+images remain original renders. The checked render and composite report are under
+`reviewed-batch/render/`. Never treat the numerical applied count as a count of
+photorealistic, anatomically correct training examples.
+
+## Experimental photographic cutouts
+
+`scripts/qwen_photo_candidates.py RUN --output NEW_FOLDER --ids ID1 ID2
+--review-python /path/to/foreground-env/bin/python --foreground-model /path/to/BiRefNet`
+tests an alternative to appearance-only inpainting. It replaces the rendered
+background with neutral grey, uses the pose/kit as guidance for a 768 px photographic
+edit, and extracts a new alpha mask with the explicitly installed local BiRefNet.
+It declines model downloads and writes a separate comparison page and RGBA cutouts.
+
+These are **visual candidates, not annotated scene replacements**. The original
+Blender contours, projected joints and bounding boxes are not ground truth for the
+edited body. Pose/camera consistency and anatomy require human review. The cutout experiment alone cannot be exported as a labelled render. Source
+renders/crops remain untouched.
+
+`scripts/assemble_basketball_example.py ROOT --approved APPROVED_CUTOUTS` assembles
+one camera-specific 5-v-5 demonstration from a clean local Blender court render,
+ten distinct photographic player cutouts and a referee cutout. The example script
+has explicit asset IDs/placements; it is not a general scene generator. Its core
+`photo_composite.py` sorts layers by ground depth and rasterizes the same thresholded
+alpha (>=128) into RGB and instance IDs. Fully hidden pixels are excluded, and boxes
+are recomputed from the final visible masks. Old Blender human masks/keypoints are
+never reused. Contact shadows are approximate background pixels.
+
+The example exports schema-2.0 scene metadata, COCO for RF-DETR, a labelled preview,
+raw instance masks and asset hashes. It independently decodes every exported COCO
+RLE with pycocotools, compares it pixel-for-pixel to final instance IDs and verifies
+box extents/areas and Reco category ordering (`ball`, `player`, `referee`, `hoop`).
+The example script therefore needs the developer dependencies. Foreground quality,
+camera/lighting consistency and anatomy still need visual review: exact annotation
+support does not imply a physically simulated match or a validated training corpus.
+Qwen (Apache-2.0) and BiRefNet (MIT) remain explicitly installed local components;
+this stage adds no downloads or inference service.
+
+## Hall-specific overnight dataset
+
+See [the local night-run workflow](HALL_NIGHT.md) for the experimental 2,000-image
+photographic compositor, asset checks, visibility/crop labels, identity-separated
+COCO splits, resume behaviour and the limits of single-hall synthetic data.

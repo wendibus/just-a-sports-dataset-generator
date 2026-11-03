@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hall photographic cutout library v1.0",
+  "type": "object",
+  "required": ["schema_version", "assets", "rejected", "generation", "traits"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "assets": {"type": "array", "items": {"type": "object", "required": ["id", "label", "gender", "skin", "kit", "pose", "extent", "height_m", "split", "seed", "file", "sha256"], "properties": {
+      "id": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"},
+      "label": {"enum": ["player", "referee"]},
+      "gender": {"enum": ["woman", "man"]},
+      "skin": {"type": "string"}, "kit": {"type": "string"}, "pose": {"type": "string"},
+      "extent": {"type": "number", "exclusiveMinimum": 0, "maximum": 2},
+      "height_m": {"type": "number", "minimum": 1.5, "maximum": 2.3},
+      "split": {"enum": ["train", "val", "test"]},
+      "seed": {"type": "integer", "minimum": 0},
+      "file": {"type": "string", "pattern": "^cutouts/[A-Za-z0-9_-]+\\.png$"},
+      "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    }}},
+    "rejected": {"type": "array"}, "generation": {"type": "string"}, "traits": {"type": "string"}
+  },
+  "additionalProperties": false
+}
