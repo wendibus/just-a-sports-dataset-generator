@@ -75,7 +75,7 @@ def generate_crops(
     resolution: int = 768,
     pose_image: bool = False,
     mode: str = "inpaint",
-    strength: float = 0.8,
+    strength: float = 0.75,
     time_limit: float | None = None,
     home: Path | None = None,
     progress: Callable[[str], None] = print,

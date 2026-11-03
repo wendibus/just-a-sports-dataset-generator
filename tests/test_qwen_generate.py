@@ -177,9 +177,9 @@ class QwenGenerateTests(unittest.TestCase):
         self.assertIn({"scheduler": "exponential"}, entries)
         self.assertIn({"device": "cpu"}, entries)
         calls = self.calls()
-        # Inpainting at strength 0.8 skips 20 % of a 5-step schedule: 4 real steps.
-        self.assertEqual([c["steps"] for c in calls], [5, 5])
-        self.assertEqual({(c["inpaint"], c["strength"]) for c in calls}, {(True, 0.8)})
+        # Strength 0.75 stretches 4 Lightning steps to a 6-step schedule (5 of them run).
+        self.assertEqual([c["steps"] for c in calls], [6, 6])
+        self.assertEqual({(c["inpaint"], c["strength"]) for c in calls}, {(True, 0.75)})
         self.assertEqual([c["cfg"] for c in calls], [1.0, 1.0])
         self.assertEqual(calls[0]["call"], 1)  # the RGB crop (plus the mask)
         self.assertEqual(calls[0]["size"], [256, 256])  # at least 256, multiple of 16
@@ -217,7 +217,7 @@ class QwenGenerateTests(unittest.TestCase):
             generate_crops(
                 self.root / "crops", self.root / "gen", confirm=never, progress=messages.append
             )
-        self.assertEqual({c["steps"] for c in self.calls()}, {38})  # ceil(30 / 0.8)
+        self.assertEqual({c["steps"] for c in self.calls()}, {40})  # ceil(30 / 0.75)
         self.assertEqual({c["cfg"] for c in self.calls()}, {4.0})
         self.assertTrue(any("Lightning LoRA not usable" in m for m in messages))
 

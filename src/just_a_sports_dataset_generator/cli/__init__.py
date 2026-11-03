@@ -132,8 +132,8 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument(
             "--strength",
             type=float,
-            default=0.8,
-            help="inpaint only: how far from the render Qwen may move (0.1-1.0, default 0.8)",
+            default=0.75,
+            help="inpaint only: how far from the render Qwen may move (0.1-1.0, default 0.75)",
         )
         command.add_argument(
             "--time-limit",

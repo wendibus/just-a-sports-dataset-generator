@@ -4,14 +4,19 @@
 #
 #   scripts/qwen-nacht.sh [OUTPUT] [HOURS] [SCENES]
 #
-# Defaults: ../qwen-nacht, 9 hours, 60 scenes, 512 px. At the end OUTPUT/index.html shows
-# every rendered person next to its Qwen result. Runs under caffeinate so the Mac stays awake.
+# Defaults: ../qwen-nacht, 9 hours, 60 scenes, 512 px, inpaint strength 0.75 (env STRENGTH).
+# An existing OUTPUT reuses its render and crops. Results are pasted back into a copy of the
+# render with composite-crops; OUTPUT/index-inpaint-<strength>.html shows, per person, the
+# render next to the repainted scene at source resolution. Runs under caffeinate so the Mac stays awake.
 set -euo pipefail
 
 OUT="${1:-../qwen-nacht}"
 HOURS="${2:-9}"
 SCENES="${3:-60}"
 RESOLUTION="${RESOLUTION:-512}"
+STRENGTH="${STRENGTH:-0.75}"
+GENERATED="generated-inpaint-$STRENGTH"
+REPAINTED="repainted-inpaint-$STRENGTH"
 
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 mkdir -p "$OUT"
@@ -56,41 +61,59 @@ else
   for attempt in 1 2 3; do
     LEFT=$(( (BUDGET - ($(date +%s) - START)) / 60 ))
     [ "$LEFT" -lt 5 ] && break
-    if sports-dataset generate-crops "$OUT/crops" --output "$OUT/generated" \
-      --resolution "$RESOLUTION" --time-limit "$LEFT"; then
+    if sports-dataset generate-crops "$OUT/crops" --output "$OUT/$GENERATED" \
+      --mode inpaint --strength "$STRENGTH" --resolution "$RESOLUTION" --time-limit "$LEFT"; then
       break
     fi
     echo "== Qwen abgebrochen (Versuch $attempt), neuer Start …"
   done
 fi
 
-python - "$OUT" <<'PY'
+echo "== $(date '+%T') Ergebnisse in die Szenen einsetzen …"
+rm -rf "$OUT/$REPAINTED"
+sports-dataset composite-crops "$OUT/render" --crops "$OUT/crops" \
+  --generated "$OUT/$GENERATED" --output "$OUT/$REPAINTED" \
+  --generator "Qwen-Image-Edit-2511 inpaint, strength $STRENGTH"
+
+python - "$OUT" "$REPAINTED" <<'PY'
 import html, json, sys
 from pathlib import Path
+from PIL import Image
 
-out = Path(sys.argv[1])
+out, repainted = Path(sys.argv[1]), sys.argv[2]
+report = json.loads((out / repainted / "composite.json").read_text())
+status = {item["id"]: item for item in report["items"]}
 crops = json.loads((out / "crops/crops.json").read_text())["crops"]
-seconds = {}
-records = out / "generated/generation.jsonl"
-if records.is_file():
-    for line in records.read_text().splitlines():
-        entry = json.loads(line)
-        seconds[entry["id"]] = entry["seconds"]
-done = [c for c in crops if (out / "generated" / f"{c['id']}.png").is_file()]
-rows = "".join(
-    f"<figure><img src='crops/{c['files']['rgb']}'><img src='generated/{c['id']}.png'>"
-    f"<figcaption>{html.escape(c['id'])} · {html.escape(c.get('pose_family') or '?')} · "
-    f"{seconds.get(c['id'], '?')} s</figcaption></figure>"
-    for c in done
-)
-mean = sum(seconds.values()) / len(seconds) if seconds else 0
-(out / "index.html").write_text(
-    "<!doctype html><meta charset='utf-8'><title>Qwen Nacht</title><style>"
+view = out / f"{repainted}-ansicht"
+view.mkdir(exist_ok=True)
+rows, counts = [], {}
+for crop in crops:
+    item = status.get(crop["id"], {})
+    state = item.get("status", "missing")
+    counts[state] = counts.get(state, 0) + 1
+    if state == "missing":
+        continue
+    box = tuple(crop["crop_box_xyxy"])
+    pair = Image.new("RGB", (512, 256))
+    for column, root in enumerate((out / "render", out / repainted)):
+        with Image.open(root / crop["source_rgb"]) as frame:
+            pair.paste(frame.crop(box).resize((256, 256), Image.Resampling.LANCZOS), (column * 256, 0))
+    pair.save(view / f"{crop['id']}.jpg", quality=90)
+    reason = html.escape(str(item.get("reason") or ""))
+    rows.append(
+        f"<figure class='{state}'><img src='{view.name}/{crop['id']}.jpg'>"
+        f"<figcaption>{html.escape(crop['id'])} · {html.escape(crop.get('pose_family') or '?')}"
+        f" · {state} {reason}</figcaption></figure>"
+    )
+summary = ", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))
+page = out / f"index-{repainted.removeprefix('repainted-')}.html"
+page.write_text(
+    "<!doctype html><meta charset='utf-8'><title>Qwen Inpaint</title><style>"
     "body{font:14px system-ui;background:#111;color:#ddd;margin:16px}"
-    "figure{display:inline-block;margin:8px}img{width:256px;height:256px}"
-    "figcaption{font-size:12px}</style>"
-    f"<h1>Qwen Nacht: {len(done)} von {len(crops)} Personen, Ø {mean:.0f} s</h1>{rows}"
+    "figure{display:inline-block;margin:8px}img{width:512px;height:256px}"
+    "figcaption{font-size:12px}.rejected img{outline:3px solid #c33}</style>"
+    f"<h1>Render | eingesetzt ({summary})</h1>{''.join(rows)}"
 )
-print(f"Übersicht: {out / 'index.html'} ({len(done)} von {len(crops)}, Ø {mean:.0f} s)")
+print(f"Übersicht: {page} ({summary})")
 PY
 echo "== $(date '+%F %T') Fertig."

@@ -129,11 +129,18 @@ background change 0.24).
 
 `--mode inpaint` (default) uses diffusers' `QwenImageEditInpaintPipeline` with the same
 installed model: generation starts from the render, only pixels inside `inpaint.png` may
-change, and `--strength` (default 0.8) sets how far the result may move away from the render.
+change, and `--strength` (default 0.75) sets how far the result may move away from the render.
 Outline, size, camera angle and kit colours therefore come from Blender. The schedule is
 stretched so that the requested 4 Lightning steps are actually run (5 scheduled steps at
 strength 0.8). The prompt describes only the person and forbids lettering except the number.
 `--mode edit` keeps the previous behaviour.
+
+Strength test on 12 crops of the night run (M4 Pro, 512 px, about 80 s per person): every
+result stays inside the silhouette and keeps the broadcast camera angle. At 0.6 bodies and
+shorts stay doll-like; at 0.75 faces, skin and fabric look real and the kit colours hold;
+at 0.9 kits start to drift (a white kit became blue, white shoes appeared). Where the 3D
+figure is bulkier than a real body (round shoulder caps, wide shorts), the result fills the
+difference with background inside the mask, visible as a faint halo.
 
 `scripts/qwen_inpaint_vergleich.py RUN` repaints 12 crops of an earlier run at strengths
 0.6, 0.75 and 0.9 and writes `RUN/vergleich/vergleich.jpg` with every result pasted back with
