@@ -119,14 +119,14 @@ Requires Python 3.11 or newer. Install Blender 5.x separately for the basketball
 python -m pip install -e .
 sports-dataset render-basketball examples/basketball-3d.json --output outputs/basketball
 sports-dataset export outputs/basketball --output outputs/dataset
-sports-dataset preview outputs/dataset --output outputs/Vorschau
+sports-dataset preview outputs/dataset --output outputs/Preview
 ```
 
 For a Reco-style full-court panorama, render `examples/basketball-reco.json` (recipe schema 1.1, `"camera": "reco_panorama"`); see [camera presets](docs/BASKETBALL.md#camera-presets).
 
 Every Blender scene also gets `poses.json` (OpenPose skeletons from the scene geometry). `sports-dataset export-crops outputs/reco --output outputs/crops` turns them into per-person RGB, mask, inpaint-mask and pose crops for pose-guided repainting, and `composite-crops` pastes generated results back without changing the labels. `sports-dataset repaint outputs/reco --output outputs/reco-repaint` does all of it with a local Qwen-Image-Edit-2511, which it installs on first use after showing the download (about 31 GB) and asking; see [pose crops](docs/POSE_CROPS.md).
 
-Open `outputs/Vorschau/index.html`. Use `--samples 64` for finer sampling or `--blender /path/to/blender` for a nonstandard installation. CPU rendering is the default; an optional `--device auto` tries Metal on macOS. See [the basketball guide](docs/BASKETBALL.md) for scope, annotation semantics, reproducibility, and limitations. Ball designs and referee kits for basketball, football and futsal are catalogued in [balls and referee kits](docs/EQUIPMENT.md); only basketball renders them so far.
+Open `outputs/Preview/index.html`. Use `--samples 64` for finer sampling or `--blender /path/to/blender` for a nonstandard installation. CPU rendering is the default; an optional `--device auto` tries Metal on macOS. See [the basketball guide](docs/BASKETBALL.md) for scope, annotation semantics, reproducibility, and limitations. Ball designs and referee kits for basketball, football and futsal are catalogued in [balls and referee kits](docs/EQUIPMENT.md); only basketball renders them so far.
 
 The old rectangle fixture remains available for fast pipeline tests:
 
@@ -136,14 +136,14 @@ sports-dataset validate examples/basketball.json
 sports-dataset plan examples/basketball.json --output plan.json
 sports-dataset render-reference examples/basketball.json --output outputs/demo --max-frames 2
 sports-dataset export outputs/demo --output outputs/dataset
-sports-dataset preview outputs/dataset --output outputs/Vorschau
+sports-dataset preview outputs/dataset --output outputs/Preview
 ```
 
 The reference renderer writes geometric RGB and instance-ID images. Export derives boxes and COCO masks from visible pixels, converts RGB to PNG, and writes native annotations, whole-scene splits, checksums, and provenance. Existing render/export folders are never overwritten; use a new output folder for each run. Render runs build in `<output>.partial` and publish it as `<output>` when complete; if a run is interrupted, running the same command again resumes it and skips finished scenes (the result is byte-identical to an uninterrupted run). A leftover with different recipe or settings is refused rather than mixed in. The renderer supports boxes and instance masks; other requested passes fail explicitly.
 
 These rectangle images are pipeline fixtures, not suitable for demonstrating photorealistic training quality. Use `render-basketball` for the 3D scenes. Open work is tracked in [docs/ROADMAP.md](docs/ROADMAP.md); the most important open question is whether the synthetic data improves RF-DETR on real footage.
 
-Open `outputs/Vorschau/index.html` to compare the actual RGB images with colored object masks offline. Raw files named `*.instances.png` store small numeric object IDs and naturally look almost black in an image viewer; they are not the training photographs. The preview never changes these IDs or the COCO dataset. The Mac starter offers **Bilder ansehen** after generation and opens the training-image folder separately.
+Open `outputs/Preview/index.html` to compare the actual RGB images with colored object masks offline. Raw files named `*.instances.png` store small numeric object IDs and naturally look almost black in an image viewer; they are not the training photographs. The preview never changes these IDs or the COCO dataset. The Mac starter offers **Bilder ansehen** after generation and opens the training-image folder separately.
 
 For development, install `python -m pip install -e ".[dev]"`, then run `python -m unittest discover -s tests -v`, `ruff check .`, `ruff format --check src tests`, and `pyright`. The [export guide](docs/EXPORTS.md) describes the optional local Reco checkout needed for importer tests. CI runs that integration check automatically against the recorded revision. Dependencies and licenses are listed in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
 

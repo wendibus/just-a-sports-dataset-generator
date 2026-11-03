@@ -161,7 +161,7 @@ class QwenSetupTests(unittest.TestCase):
 
     def test_declined_consent_installs_nothing(self):
         asked = []
-        with self.assertRaisesRegex(SetupError, "abgelehnt"):
+        with self.assertRaisesRegex(SetupError, "declined"):
             ensure_installed(lambda plan: asked.append(plan) is not None, progress=lambda _: None)
         self.assertEqual(len(asked), 1)
         self.assertFalse(self.home.exists())

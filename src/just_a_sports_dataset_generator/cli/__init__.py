@@ -156,10 +156,10 @@ def _confirm(approved: bool) -> Callable[[InstallPlan], bool]:
         if approved:
             return True
         if not sys.stdin.isatty():
-            print("Zum Bestätigen erneut mit --yes ausführen.", file=sys.stderr)
+            print("Run again with --yes to confirm.", file=sys.stderr)
             return False
-        answer = input("Herunterladen und einrichten? [j/N] ").strip().lower()
-        return answer in ("j", "ja", "y", "yes")
+        answer = input("Download and set up? [y/N] ").strip().lower()
+        return answer in ("y", "yes", "j", "ja")
 
     return confirm
 
@@ -169,13 +169,13 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
     if args.command == "qwen-status":
         manifest = installed()
         if manifest is None:
-            print("Qwen ist nicht eingerichtet. Mit 'sports-dataset setup-qwen' installieren.")
+            print("Qwen is not set up. Install it with 'sports-dataset setup-qwen'.")
             return 1
-        print(f"Qwen bereit: {manifest['model']} {manifest['quant']} ({manifest['base_dir']})")
+        print(f"Qwen ready: {manifest['model']} {manifest['quant']} ({manifest['base_dir']})")
         return 0
     if args.command == "setup-qwen":
         manifest = ensure_installed(_confirm(args.yes), args.quant, progress=report)
-        print(f"Qwen bereit: {manifest['model']} {manifest['quant']}")
+        print(f"Qwen ready: {manifest['model']} {manifest['quant']}")
         return 0
     if args.command == "generate-crops":
         made = generate_crops(
@@ -194,7 +194,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             strength=args.strength,
             progress=report,
         )
-        print(f"{made.generated} von {made.total} Personen generiert in {args.output}")
+        print(f"{made.generated} of {made.total} people generated in {args.output}")
         return 0
     if args.command == "repaint":
         work = args.output
@@ -223,8 +223,8 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
             args.render, crops_dir, generated_dir, final, blend=args.blend, generator=made.generator
         )
         print(
-            f"{merged.applied} Personen ersetzt, {merged.rejected} verworfen, "
-            f"{merged.missing} fehlen. Ergebnis: {final} (Details in composite.json)"
+            f"{merged.applied} people replaced, {merged.rejected} rejected, "
+            f"{merged.missing} missing. Result: {final} (details in composite.json)"
         )
         return 0
     if args.command == "preview":
@@ -309,7 +309,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
         }
         with resumable_directory(args.output, fingerprint) as (staging, resumed):
             if resumed:
-                message = "Abgebrochener Lauf wird fortgesetzt; fertige Szenen werden übernommen."
+                message = "Resuming an interrupted run; finished scenes are kept."
                 print(message, flush=True)
                 if progress:
                     progress(message)
@@ -320,7 +320,7 @@ def _execute(args: argparse.Namespace, progress: Callable[[str], None] | None = 
                     frames = len(json.loads(manifest.read_text(encoding="utf-8"))["frames"])
                     results.append(RenderResult(job.job_id, manifest.parent, frames, manifest))
                     continue
-                message = f"Szene {index + 1} von {len(jobs)} wird berechnet …"
+                message = f"Rendering scene {index + 1} of {len(jobs)} …"
                 print(message, flush=True)
                 if progress:
                     progress(message)

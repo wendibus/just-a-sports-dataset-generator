@@ -142,18 +142,21 @@ at 0.9 kits start to drift (a white kit became blue, white shoes appeared). Wher
 figure is bulkier than a real body (round shoulder caps, wide shorts), the result fills the
 difference with background inside the mask, visible as a faint halo.
 
-`scripts/qwen_inpaint_vergleich.py RUN` repaints 12 crops of an earlier run at strengths
-0.6, 0.75 and 0.9 and writes `RUN/vergleich/vergleich.jpg` with every result pasted back with
+`scripts/qwen_inpaint_compare.py RUN` repaints 12 crops of an earlier run at strengths
+0.6, 0.75 and 0.9 and writes `RUN/compare/compare.jpg` with every result pasted back with
 the instance mask.
 
 ## Overnight batch
 
-`scripts/qwen-nacht.sh [OUTPUT] [HOURS] [SCENES]` (defaults `../qwen-nacht`, 9, 60) renders
-broadcast scenes, exports 512 px crops with `export-crops --isolated` and runs
-`generate-crops --resolution 512 --time-limit` with whatever time is left; at the end
-`OUTPUT/index.html` shows each rendered person next to its result with the seconds per
-person. It keeps the Mac awake with `caffeinate`, restarts Qwen after a crash and resumes
-every step when started again.
+`scripts/qwen-overnight.sh [OUTPUT] [HOURS] [SCENES]` (defaults `../qwen-overnight`, 9,
+60; env `STRENGTH`, default 0.75) renders broadcast scenes, exports 512 px crops with
+`export-crops --isolated`, runs `generate-crops --mode inpaint --resolution 512
+--time-limit` with whatever time is left and pastes the results back with
+`composite-crops`. `OUTPUT/index-inpaint-<strength>.html` then shows, per person, the
+render next to the repainted scene at source resolution and whether the quality checks
+applied or rejected it. An existing OUTPUT reuses its render and crops. The script keeps
+the Mac awake with `caffeinate`, restarts Qwen after a crash and resumes every step when
+started again.
 
 `--isolated` keeps only people whose whole crop box lies inside the frame, whose 14 body
 joints are all visible (`v = 2`) and whose crop box shows at most 3 % other players or

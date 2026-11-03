@@ -1,10 +1,10 @@
 """Compare Qwen inpainting strengths on a few crops of an earlier run.
 
-    python scripts/qwen_inpaint_vergleich.py ../qwen-nacht [--strengths 0.6 0.75 0.9] [--count 12]
+    python scripts/qwen_inpaint_compare.py ../qwen-overnight [--strengths 0.6 0.75 0.9] [--count 12]
 
 Copies ``--count`` crops (spread over pose families and referees) from CROPS_RUN/crops into
-CROPS_RUN/vergleich/crops, runs ``generate-crops --mode inpaint`` once per strength and writes
-CROPS_RUN/vergleich/vergleich.jpg: per crop the render and, per strength, the result pasted
+CROPS_RUN/compare/crops, runs ``generate-crops --mode inpaint`` once per strength and writes
+CROPS_RUN/compare/compare.jpg: per crop the render and, per strength, the result pasted
 back with the exact instance mask, as ``composite-crops --blend mask`` would do it.
 """
 
@@ -35,14 +35,14 @@ def pick(crops: list[dict], count: int) -> list[dict]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("run", type=Path, help="folder with crops/ from qwen-nacht.sh")
+    parser.add_argument("run", type=Path, help="folder with crops/ from qwen-overnight.sh")
     parser.add_argument("--strengths", type=float, nargs="+", default=[0.6, 0.75, 0.9])
     parser.add_argument("--count", type=int, default=12)
     parser.add_argument("--resolution", type=int, default=512)
     args = parser.parse_args()
 
     source = args.run.resolve() / "crops"
-    target = args.run.resolve() / "vergleich"
+    target = args.run.resolve() / "compare"
     crops_dir = target / "crops"
     index = json.loads((source / "crops.json").read_text())
     if not (crops_dir / "crops.json").is_file():
@@ -55,8 +55,8 @@ def main() -> int:
     chosen = json.loads((crops_dir / "crops.json").read_text())["crops"]
 
     for strength in args.strengths:
-        output = target / f"staerke-{strength:g}"
-        print(f"== Stärke {strength:g} -> {output}", flush=True)
+        output = target / f"strength-{strength:g}"
+        print(f"== strength {strength:g} -> {output}", flush=True)
         code = subprocess.call(
             [
                 sys.executable,
@@ -75,7 +75,7 @@ def main() -> int:
             ]
         )
         if code:
-            print(f"Stärke {strength:g} fehlgeschlagen (exit {code}); weiter mit der nächsten")
+            print(f"strength {strength:g} failed (exit {code}); continuing with the next")
 
     size = 200
     columns = 1 + len(args.strengths)
@@ -90,15 +90,15 @@ def main() -> int:
         sheet.paste(rgb.resize((size, size)), (0, y + 16))
         draw.text((4, y + 2), f"{crop['label']} {crop.get('pose_family')}", fill=(255, 255, 0))
         for column, strength in enumerate(args.strengths, 1):
-            result = target / f"staerke-{strength:g}" / f"{crop['id']}.png"
-            draw.text((column * size + 4, y + 2), f"Stärke {strength:g}", fill=(255, 255, 0))
+            result = target / f"strength-{strength:g}" / f"{crop['id']}.png"
+            draw.text((column * size + 4, y + 2), f"strength {strength:g}", fill=(255, 255, 0))
             if result.is_file():
                 with Image.open(result) as raw:
                     generated = raw.convert("RGB").resize(rgb.size)
                 pasted = Image.composite(generated, rgb, mask)
                 sheet.paste(pasted.resize((size, size)), (column * size, y + 16))
-    sheet.save(target / "vergleich.jpg", quality=88)
-    print(f"Übersicht: {target / 'vergleich.jpg'}")
+    sheet.save(target / "compare.jpg", quality=88)
+    print(f"Overview: {target / 'compare.jpg'}")
     return 0
 
 

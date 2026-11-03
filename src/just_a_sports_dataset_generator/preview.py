@@ -28,7 +28,7 @@ from just_a_sports_dataset_generator.storage import new_directory
 
 _COLORS = ((225, 68, 83), (49, 104, 222), (183, 111, 34), (12, 150, 111), (143, 80, 204))
 _BACKGROUND = (235, 239, 245)
-_SPLIT_NAMES = {"train": "Training", "val": "Validierung", "test": "Test"}
+_SPLIT_NAMES = {"train": "Training", "val": "Validation", "test": "Test"}
 _STYLE = """
 *{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#182333;font:16px/1.5 system-ui,sans-serif}
 main{max-width:1300px;margin:auto;padding:32px 24px}h1{font-size:30px;margin:0 0 8px}
@@ -89,10 +89,10 @@ def create_preview(dataset: Path, destination: Path, limit: int = 48) -> Path:
         for item in renderers
     )
     status = (
-        "Lokal gerenderte 3D-Basketballszenen mit prozeduralen Figuren. "
-        "Fotorealismus und Nutzen für das Modelltraining sind noch nicht validiert."
+        "Locally rendered 3D basketball scenes with procedural figures. "
+        "Photorealism and the benefit for model training are not validated yet."
         if basketball_3d
-        else "Der Referenzrenderer erzeugt geometrische Testbilder. Fotorealistische Sportszenen sind noch in Entwicklung."
+        else "The reference renderer creates geometric test images. Photorealistic sports scenes are still in development."
     )
     cards: list[str] = []
     total = 0
@@ -153,14 +153,14 @@ def create_preview(dataset: Path, destination: Path, limit: int = 48) -> Path:
                     os.path.relpath(rgb_path, destination.resolve()).replace(os.sep, "/"), safe="/"
                 )
                 cards.append(
-                    f'<section class="frame"><h2>Bild {len(cards) + 1} · {_SPLIT_NAMES[split]}</h2>'
-                    '<div class="pair"><figure><figcaption>Farbbild für RF-DETR</figcaption>'
+                    f'<section class="frame"><h2>Image {len(cards) + 1} · {_SPLIT_NAMES[split]}</h2>'
+                    '<div class="pair"><figure><figcaption>RGB image for RF-DETR</figcaption>'
                     f'<a href="{escape(original_url, quote=True)}">'
-                    f'<img src="images/{stem}-rgb.png" alt="Originales Farbbild" loading="lazy"></a>'
-                    '<p class="note">Anklicken öffnet das Originalbild.</p></figure>'
-                    "<figure><figcaption>Objektbereiche · farbige Vorschau</figcaption>"
-                    f'<img src="images/{stem}-mask.png" alt="Farbig dargestellte Objektmaske" loading="lazy">'
-                    '<p class="note">Nur zur Kontrolle; die numerischen Labels bleiben erhalten.</p>'
+                    f'<img src="images/{stem}-rgb.png" alt="Original RGB image" loading="lazy"></a>'
+                    '<p class="note">Click to open the original image.</p></figure>'
+                    "<figure><figcaption>Object regions · colored preview</figcaption>"
+                    f'<img src="images/{stem}-mask.png" alt="Colored object mask" loading="lazy">'
+                    '<p class="note">For checking only; the numeric labels are unchanged.</p>'
                     "</figure></div></section>"
                 )
         legend = "".join(
@@ -169,17 +169,17 @@ def create_preview(dataset: Path, destination: Path, limit: int = 48) -> Path:
             for index, label in enumerate(labels)
         )
         html = (
-            '<!doctype html><html lang="de"><meta charset="utf-8">'
+            '<!doctype html><html lang="en"><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            f"<title>Bilder ansehen · {escape(sport)}</title><style>{_STYLE}</style><body><main>"
-            '<span class="badge">Lokal · RF-DETR · Bildkontrolle</span>'
-            "<h1>Deine erzeugten Bilder</h1>"
-            '<p class="intro">Links stehen die Farbbilder für das Training. Rechts werden die '
-            "Objektbereiche zur Kontrolle eingefärbt. Rohe Maskendateien können fast schwarz "
-            "aussehen: Sie speichern Objektnummern statt sichtbarer Farben.</p>"
+            f"<title>View images · {escape(sport)}</title><style>{_STYLE}</style><body><main>"
+            '<span class="badge">Local · RF-DETR · image check</span>'
+            "<h1>Your generated images</h1>"
+            '<p class="intro">Left: the RGB images for training. Right: the object regions, '
+            "colored for checking. Raw mask files can look almost black: they store object "
+            "numbers instead of visible colors.</p>"
             f'<p class="intro">{status}</p>'
-            f'<p class="note">Vorschau: {len(cards)} von {total} Bildern. '
-            "Für Reco Trainer den Ordner dataset/coco importieren.</p>"
+            f'<p class="note">Preview: {len(cards)} of {total} images. '
+            "Import the folder dataset/coco into Reco Trainer.</p>"
             f'<div class="legend">{legend}</div>' + "".join(cards) + "</main></body></html>"
         )
         (staging / "index.html").write_text(html, encoding="utf-8")

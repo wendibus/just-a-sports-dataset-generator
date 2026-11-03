@@ -61,7 +61,7 @@ class ResumeTests(unittest.TestCase):
             with patch.object(ReferenceRenderer, "render", counting):
                 code, text = run(root / "out")
             self.assertEqual(code, 0, text)
-            self.assertIn("fortgesetzt", text)
+            self.assertIn("Resuming", text)
             self.assertEqual(calls, ["scene-000001", "scene-000002"])
             self.assertFalse(partial.exists())
             self.assertFalse((root / "out/resume.json").exists())

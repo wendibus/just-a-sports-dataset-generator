@@ -285,28 +285,28 @@ def describe(plan: InstallPlan) -> str:
     """Human-readable consent text: sources, sizes, licenses, destination."""
     gigabytes = 1_000_000_000
     lines = [
-        "Qwen-Image-Edit-2511 wird lokal eingerichtet (einmalig, danach offline nutzbar).",
+        "Qwen-Image-Edit-2511 will be set up locally (once; offline afterwards).",
         "",
     ]
     for component in plan.components:
         lines.append(
             f"- {component.repo} @ {component.revision[:12]} — {component.purpose}: "
-            f"{len(component.files)} Datei(en), {component.size / gigabytes:.1f} GB, "
-            f"Lizenz {component.license}"
+            f"{len(component.files)} file(s), {component.size / gigabytes:.1f} GB, "
+            f"license {component.license}"
         )
     if plan.python:
         lines.append(
             f"- Python {plan.python.version} (python-build-standalone {PYTHON_RELEASE}, "
-            f"{plan.python.triple}): ca. {PYTHON_ESTIMATE_BYTES / 1e6:.0f} MB, Lizenz PSF-2.0"
+            f"{plan.python.triple}): about {PYTHON_ESTIMATE_BYTES / 1e6:.0f} MB, license PSF-2.0"
         )
     lines += [
         (
-            f"- Python-Pakete von PyPI (PyTorch, diffusers …): ca. "
+            f"- Python packages from PyPI (PyTorch, diffusers …): about "
             f"{PACKAGES_ESTIMATE_BYTES / gigabytes:.0f} GB"
         ),
         "",
         f"Download gesamt: ca. {(plan.download_bytes + PACKAGES_ESTIMATE_BYTES) / gigabytes:.1f} GB",
-        f"Ziel: {plan.home}",
+        f"Destination: {plan.home}",
         "Speicherbedarf beim Generieren: ca. 30 GB Arbeitsspeicher.",
     ]
     return "\n".join(lines)
@@ -342,7 +342,9 @@ def find_python() -> Path:
             continue
         if version == "True":
             return candidate
-    raise SetupError("Python 3.10–3.13 wurde nicht gefunden; bitte installieren (z. B. python.org)")
+    raise SetupError(
+        "Python 3.10–3.13 was not found; please install it (for example from python.org)"
+    )
 
 
 def _verify(path: Path, item: PlannedFile) -> bool:
@@ -429,7 +431,7 @@ def update_packages(home: Path | None, progress: Callable[[str], None]) -> dict[
         raise SetupError("Qwen is not installed")
     if manifest.get("packages") == list(PACKAGES):
         return manifest
-    progress("Python-Pakete der Qwen-Umgebung werden aktualisiert …")
+    progress("Updating the Python packages of the Qwen environment …")
     folder = qwen_home(home)
     _pip_install(Path(str(manifest["python"])), PACKAGES, folder / "pip-update.log")
     manifest["packages"] = list(PACKAGES)
@@ -444,7 +446,7 @@ def _install_python(python: PortablePython, home: Path, progress: Callable[[str]
     marker = folder / ".sha256"
     if executable.is_file() and marker.is_file() and marker.read_text().strip() == python.sha256:
         return executable
-    progress(f"Python {python.version} wird geladen …")
+    progress(f"Downloading Python {python.version} …")
     archive = home / "downloads" / "python.tar.gz"
     archive.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -501,7 +503,7 @@ def install(
     needed = plan.download_bytes + packages + 1_000_000_000
     if free < needed:
         raise SetupError(
-            f"zu wenig Speicherplatz: {needed / 1e9:.0f} GB nötig, {free / 1e9:.0f} GB frei"
+            f"not enough disk space: {needed / 1e9:.0f} GB needed, {free / 1e9:.0f} GB free"
         )
     (home / "installed.json").unlink(missing_ok=True)
     runtime = home / "runtime"
@@ -513,7 +515,7 @@ def install(
             base = _install_python(plan.python, home, progress)
         else:
             base = find_python()
-        progress("Python-Umgebung wird angelegt …")
+        progress("Creating the Python environment …")
         command = [str(base), "-m", "venv", str(runtime)]
         result = subprocess.run(
             command + ([] if plan.packages else ["--without-pip"]),
@@ -525,7 +527,7 @@ def install(
             shutil.rmtree(runtime, ignore_errors=True)
             raise SetupError(f"could not create the Python environment: {result.stderr.strip()}")
     if plan.packages:
-        progress("Python-Pakete werden installiert …")
+        progress("Installing Python packages …")
         _pip_install(interpreter, plan.packages, home / "pip.log")
     for component in plan.components:
         folder = model_dir(home, component.repo, component.revision)
@@ -558,7 +560,7 @@ def install(
     }
     write_json(home / "installed.json", manifest)
     shutil.rmtree(home / "downloads", ignore_errors=True)
-    progress("Qwen ist eingerichtet.")
+    progress("Qwen is set up.")
     return home / "installed.json"
 
 

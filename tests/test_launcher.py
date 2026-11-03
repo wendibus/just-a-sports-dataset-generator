@@ -33,7 +33,7 @@ class LauncherTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_an_interrupted_run_resumes_and_is_published_once(self):
-        destination = self.root / "Ausgaben/Durchlauf-1"
+        destination = self.root / "Outputs/Run-1"
         rendered: list[str] = []
 
         def interrupted(self, job, output, max_frames=None):
@@ -63,9 +63,9 @@ class LauncherTests(unittest.TestCase):
                 self.recipe, destination, True, reference=True, progress=messages.append
             )
         self.assertEqual(rendered, ["scene-000001", "scene-000002"])
-        self.assertTrue(any("fortgesetzt" in m for m in messages))
+        self.assertTrue(any("Resuming" in m for m in messages))
         self.assertEqual(report["images"], 6)
-        self.assertTrue((destination / "Vorschau/index.html").is_file())
+        self.assertTrue((destination / "Preview/index.html").is_file())
         self.assertTrue((destination / "dataset/coco").is_dir())
         self.assertFalse(launcher.work_folder(destination).exists())
         self.assertFalse((destination / "launcher.json").exists())
@@ -74,7 +74,7 @@ class LauncherTests(unittest.TestCase):
         self.assertFalse(launcher.state_file().exists())
 
     def test_a_work_folder_with_other_settings_is_refused(self):
-        destination = self.root / "Ausgaben/Durchlauf-2"
+        destination = self.root / "Outputs/Run-2"
 
         def failing(self, job, output, max_frames=None):
             raise ValueError("stopped")
