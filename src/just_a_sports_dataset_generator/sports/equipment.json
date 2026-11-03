@@ -1,0 +1,708 @@
+{
+  "schema_version": "1.0",
+  "season": "2025/26",
+  "note": "Appearance catalogue for synthetic scenes: colours, cuts and ball designs only. Brand names, league names and logos are provenance, never rendered. Colours are sRGB hex. 'observed_in' lists where the supplied datasheets show the look; 'weight' is the sampling weight (number of datasheet columns showing it). Profiles reweight the same looks: 'international' (default) uses the datasheet counts, 'germany' the looks most common in German leagues and amateur play.",
+  "sports": {
+    "basketball": {
+      "ball": {
+        "regulation": {
+          "size": 7,
+          "circumference_cm": [
+            74.9,
+            78.0
+          ],
+          "mass_g": [
+            567,
+            650
+          ],
+          "bounce": "dropped from 1.80 m (bottom of the ball), rebounds to 1.20-1.40 m (top of the ball)",
+          "variants": [
+            {
+              "size": 6,
+              "circumference_cm": [
+                72.4,
+                73.7
+              ],
+              "mass_g": [
+                510,
+                567
+              ],
+              "use": "women"
+            }
+          ],
+          "source": "FIBA Official Basketball Rules, Basketball Equipment; values as in the supplied datasheets",
+          "verified": false
+        },
+        "designs": [
+          {
+            "id": "classic_orange",
+            "description": "single orange leather or composite, 8 panels, black seams",
+            "base": "#C8551E",
+            "panels": null,
+            "seams": "#1A1410",
+            "weight": 3,
+            "observed_in": [
+              "NBA",
+              "NBB (Brazil)",
+              "NCAA"
+            ]
+          },
+          {
+            "id": "orange_ivory",
+            "description": "orange with ivory/cream panels, 12 panels",
+            "base": "#D2541C",
+            "panels": "#EDE3CF",
+            "seams": "#1A1410",
+            "weight": 3,
+            "observed_in": [
+              "FIBA",
+              "DBB (Germany)",
+              "LBA (Italy)"
+            ]
+          },
+          {
+            "id": "orange_black",
+            "description": "two-tone orange and black",
+            "base": "#D9601F",
+            "panels": "#1C1C1E",
+            "seams": "#1A1410",
+            "weight": 3,
+            "observed_in": [
+              "EuroLeague",
+              "ACB (Spain)",
+              "Betclic Elite (France)"
+            ]
+          },
+          {
+            "id": "dark_brown",
+            "description": "traditional dark brown leather look",
+            "base": "#6B3018",
+            "panels": null,
+            "seams": "#120C08",
+            "weight": 3,
+            "observed_in": [
+              "B.League (Japan)",
+              "amateur and club play",
+              "training balls"
+            ]
+          }
+        ]
+      },
+      "referee": {
+        "rules": "FIBA: grey shirt, long black trousers, black socks and shoes; the shirt must differ from both team colours.",
+        "kits": [
+          {
+            "id": "grey_black_sleeves",
+            "shirt": "#9EA2A6",
+            "sleeves": "#151517",
+            "pattern": "plain",
+            "accent": null,
+            "lower": "trousers",
+            "lower_color": "#121214",
+            "socks": "#121214",
+            "weight": 7,
+            "observed_in": [
+              "NBA",
+              "FIBA",
+              "DBB (Germany)",
+              "ACB (Spain)",
+              "FIP (Italy)",
+              "NBB (Brazil)",
+              "B.League (Japan)"
+            ]
+          },
+          {
+            "id": "orange_black_sleeves",
+            "shirt": "#F26A1B",
+            "sleeves": "#151517",
+            "pattern": "plain",
+            "accent": null,
+            "lower": "trousers",
+            "lower_color": "#121214",
+            "socks": "#121214",
+            "weight": 1,
+            "observed_in": [
+              "EuroLeague"
+            ]
+          },
+          {
+            "id": "black_neon",
+            "shirt": "#26272A",
+            "sleeves": "#26272A",
+            "pattern": "plain",
+            "accent": "#D7F21E",
+            "lower": "trousers",
+            "lower_color": "#121214",
+            "socks": "#121214",
+            "weight": 1,
+            "observed_in": [
+              "FFBB (France)"
+            ]
+          },
+          {
+            "id": "black_white_stripes",
+            "shirt": "#F2F2F0",
+            "sleeves": "#151517",
+            "pattern": "vertical_stripes",
+            "accent": "#151517",
+            "lower": "trousers",
+            "lower_color": "#121214",
+            "socks": "#121214",
+            "weight": 1,
+            "observed_in": [
+              "NCAA (USA)"
+            ]
+          }
+        ]
+      },
+      "profiles": {
+        "germany": {
+          "balls": {
+            "orange_ivory": 8,
+            "classic_orange": 1,
+            "orange_black": 0.5,
+            "dark_brown": 1
+          },
+          "referee_kits": {
+            "grey_black_sleeves": 9,
+            "orange_black_sleeves": 0,
+            "black_neon": 1,
+            "black_white_stripes": 0
+          }
+        }
+      }
+    },
+    "football": {
+      "ball": {
+        "regulation": {
+          "size": 5,
+          "circumference_cm": [
+            68.0,
+            70.0
+          ],
+          "mass_g": [
+            410,
+            450
+          ],
+          "pressure_atm": [
+            0.6,
+            1.1
+          ],
+          "source": "IFAB Laws of the Game, Law 2 (theifab.com)",
+          "verified": true
+        },
+        "designs": [
+          {
+            "id": "stars_blue_gold",
+            "base": "#F4F4F2",
+            "accents": [
+              "#1F3E8C",
+              "#C9A43A"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "UEFA Champions League"
+            ]
+          },
+          {
+            "id": "swirl_red_green_blue",
+            "base": "#F4F4F2",
+            "accents": [
+              "#D3272D",
+              "#1E8C3A",
+              "#1F5FBF"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "FIFA World Cup 2026"
+            ]
+          },
+          {
+            "id": "flames_pink_orange",
+            "base": "#F4F4F2",
+            "accents": [
+              "#E8336D",
+              "#F28A1F"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "Bundesliga"
+            ]
+          },
+          {
+            "id": "zigzag_purple_magenta",
+            "base": "#F4F4F2",
+            "accents": [
+              "#7A2A9C",
+              "#D13BB0"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "Premier League"
+            ]
+          },
+          {
+            "id": "yellow_purple",
+            "base": "#F2D81C",
+            "accents": [
+              "#5B2C8F",
+              "#1C1C1E"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "LaLiga",
+              "high-visibility winter balls"
+            ]
+          },
+          {
+            "id": "cyan_blue_pink",
+            "base": "#F4F4F2",
+            "accents": [
+              "#21B5D6",
+              "#2A4FB8",
+              "#E04B91"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "Serie A"
+            ]
+          },
+          {
+            "id": "pink_black",
+            "base": "#F4F4F2",
+            "accents": [
+              "#E34C7E",
+              "#1C1C1E"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "Ligue 1"
+            ]
+          },
+          {
+            "id": "blue_yellow_green",
+            "base": "#F4F4F2",
+            "accents": [
+              "#2556C4",
+              "#F2D81C",
+              "#2FA84F"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "Brasileirao"
+            ]
+          },
+          {
+            "id": "red_blue_black",
+            "base": "#F4F4F2",
+            "accents": [
+              "#D3272D",
+              "#1F4FA8",
+              "#1C1C1E"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "MLS"
+            ]
+          },
+          {
+            "id": "yellow_black",
+            "base": "#F4F4F2",
+            "accents": [
+              "#E8E020",
+              "#1C1C1E"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "J.League"
+            ]
+          }
+        ]
+      },
+      "referee": {
+        "rules": "IFAB Laws of the Game: referees wear colours that differ from both teams and the goalkeepers. Short-sleeved shirt, often with two chest pockets, black shorts, knee-high socks.",
+        "kits": [
+          {
+            "id": "fluo_blue",
+            "shirt": "#2CB5F0",
+            "sleeves": "#2CB5F0",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#2CB5F0",
+            "weight": 1,
+            "observed_in": [
+              "UEFA"
+            ]
+          },
+          {
+            "id": "fluo_yellow",
+            "shirt": "#E3F21E",
+            "sleeves": "#E3F21E",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#E3F21E",
+            "weight": 1,
+            "observed_in": [
+              "UEFA"
+            ]
+          },
+          {
+            "id": "black",
+            "shirt": "#1E1F22",
+            "sleeves": "#1E1F22",
+            "pattern": "chest_pockets",
+            "accent": "#55585C",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#151517",
+            "weight": 2,
+            "observed_in": [
+              "Premier League",
+              "German amateur leagues"
+            ]
+          },
+          {
+            "id": "turquoise",
+            "shirt": "#3CD2D8",
+            "sleeves": "#3CD2D8",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#3CD2D8",
+            "weight": 1,
+            "observed_in": [
+              "RFEF (Spain)"
+            ]
+          },
+          {
+            "id": "red",
+            "shirt": "#E5262E",
+            "sleeves": "#E5262E",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#E5262E",
+            "weight": 1,
+            "observed_in": [
+              "RFEF (Spain)"
+            ]
+          },
+          {
+            "id": "grey",
+            "shirt": "#A3A6AA",
+            "sleeves": "#A3A6AA",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#151517",
+            "weight": 1,
+            "observed_in": [
+              "Italy"
+            ]
+          },
+          {
+            "id": "orange",
+            "shirt": "#F47A1F",
+            "sleeves": "#F47A1F",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#F47A1F",
+            "weight": 1,
+            "observed_in": [
+              "France"
+            ]
+          },
+          {
+            "id": "yellow",
+            "shirt": "#F4D51C",
+            "sleeves": "#F4D51C",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#151517",
+            "weight": 2,
+            "observed_in": [
+              "Brazil",
+              "USA amateur"
+            ]
+          }
+        ]
+      },
+      "profiles": {
+        "germany": {
+          "balls": {
+            "flames_pink_orange": 4
+          },
+          "referee_kits": {
+            "black": 4,
+            "fluo_yellow": 1,
+            "fluo_blue": 1,
+            "red": 1,
+            "turquoise": 0,
+            "grey": 0,
+            "orange": 0,
+            "yellow": 0
+          }
+        }
+      }
+    },
+    "futsal": {
+      "ball": {
+        "regulation": {
+          "size": 4,
+          "circumference_cm": [
+            62.0,
+            64.0
+          ],
+          "mass_g": [
+            400,
+            440
+          ],
+          "pressure_atm": [
+            0.6,
+            0.9
+          ],
+          "bounce": "dropped from 2 m, first rebound 50-65 cm",
+          "source": "Futsal Laws of the Game, Law 2 (thefa.com); the supplied datasheet's 0.4-0.6 bar is not used",
+          "verified": true
+        },
+        "designs": [
+          {
+            "id": "purple_yellow",
+            "base": "#F4F4F2",
+            "accents": [
+              "#4B2A9C",
+              "#E8E020"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "FIFA"
+            ]
+          },
+          {
+            "id": "blue_neon",
+            "base": "#F4F4F2",
+            "accents": [
+              "#1F8FE0",
+              "#DDF21E"
+            ],
+            "weight": 2,
+            "observed_in": [
+              "UEFA",
+              "FIGC (Italy)"
+            ]
+          },
+          {
+            "id": "black_neon",
+            "base": "#F4F4F2",
+            "accents": [
+              "#1C1C1E",
+              "#DDF21E"
+            ],
+            "weight": 2,
+            "observed_in": [
+              "DFB (Germany)",
+              "CBFS (Brazil)"
+            ]
+          },
+          {
+            "id": "red_orange",
+            "base": "#F4F4F2",
+            "accents": [
+              "#E5262E",
+              "#F59A1F",
+              "#F2D81C"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "RFEF (Spain)"
+            ]
+          },
+          {
+            "id": "red_blue",
+            "base": "#F4F4F2",
+            "accents": [
+              "#D3272D",
+              "#1F3E9C"
+            ],
+            "weight": 2,
+            "observed_in": [
+              "FFF (France)",
+              "USSF (USA)"
+            ]
+          },
+          {
+            "id": "purple_neon",
+            "base": "#F4F4F2",
+            "accents": [
+              "#5B2C8F",
+              "#DDF21E"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "The FA (England)"
+            ]
+          },
+          {
+            "id": "blue",
+            "base": "#F4F4F2",
+            "accents": [
+              "#1F55B8"
+            ],
+            "weight": 1,
+            "observed_in": [
+              "JFA (Japan)"
+            ]
+          }
+        ]
+      },
+      "referee": {
+        "rules": "Futsal Laws of the Game: referees wear colours that differ from both teams and the goalkeepers. Short-sleeved shirt with two breast pockets, black shorts, black or matching socks.",
+        "kits": [
+          {
+            "id": "black",
+            "shirt": "#1E1F22",
+            "sleeves": "#1E1F22",
+            "pattern": "chest_pockets",
+            "accent": "#55585C",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#151517",
+            "weight": 9,
+            "observed_in": [
+              "FIFA",
+              "UEFA",
+              "DFB",
+              "RFEF",
+              "FIGC",
+              "FFF",
+              "The FA",
+              "USSF",
+              "JFA"
+            ]
+          },
+          {
+            "id": "yellow",
+            "shirt": "#F2DF1C",
+            "sleeves": "#F2DF1C",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#151517",
+            "weight": 6,
+            "observed_in": [
+              "FIFA",
+              "UEFA",
+              "DFB",
+              "The FA",
+              "CBF",
+              "JFA"
+            ]
+          },
+          {
+            "id": "fluo_blue",
+            "shirt": "#2CB5F0",
+            "sleeves": "#2CB5F0",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#2CB5F0",
+            "weight": 3,
+            "observed_in": [
+              "FIFA",
+              "UEFA",
+              "USSF"
+            ]
+          },
+          {
+            "id": "red",
+            "shirt": "#E5262E",
+            "sleeves": "#E5262E",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#151517",
+            "weight": 3,
+            "observed_in": [
+              "UEFA",
+              "RFEF",
+              "USSF"
+            ]
+          },
+          {
+            "id": "grey",
+            "shirt": "#A3A6AA",
+            "sleeves": "#A3A6AA",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#151517",
+            "weight": 3,
+            "observed_in": [
+              "DFB",
+              "FIGC",
+              "JFA"
+            ]
+          },
+          {
+            "id": "turquoise",
+            "shirt": "#3CD2D8",
+            "sleeves": "#3CD2D8",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#3CD2D8",
+            "weight": 1,
+            "observed_in": [
+              "RFEF (Spain)"
+            ]
+          },
+          {
+            "id": "orange",
+            "shirt": "#F47A1F",
+            "sleeves": "#F47A1F",
+            "pattern": "chest_pockets",
+            "accent": "#151517",
+            "lower": "shorts",
+            "lower_color": "#151517",
+            "socks": "#F47A1F",
+            "weight": 1,
+            "observed_in": [
+              "FFF (France)"
+            ]
+          }
+        ]
+      },
+      "profiles": {
+        "germany": {
+          "balls": {
+            "black_neon": 4
+          },
+          "referee_kits": {
+            "black": 4,
+            "grey": 1,
+            "yellow": 1,
+            "turquoise": 0,
+            "orange": 0
+          }
+        }
+      }
+    }
+  },
+  "default_profile": "international"
+}

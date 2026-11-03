@@ -1,8 +1,8 @@
 # Local 3D basketball — version 0.4
 
 The backend generates a procedural indoor court, painted markings, two baskets,
-ten athletes in two kits, one or two referees, a basketball, stands with optional
-spectators, lights, and a camera. A renderer-independent planner varies the game
+ten athletes in two kits, one or two referees, a basketball, empty stands, lights,
+and a camera. A renderer-independent planner varies the game
 situation, poses, ball, hall and motion per scene (see [scene variety](#scene-variety)).
 It needs locally installed Blender 5.x. No models, textures, motion libraries,
 accounts, or remote processing services are used. Geometry and materials are
@@ -59,20 +59,25 @@ the plan's version, situation, ball event and checksum as an asset.
   sports' lines never share the basketball line colour.
 - **Hall and light**: wood tone and gloss, key, line, wall and seat colours, light
   energy, colour temperature (3800–6500 K) and number of light rows, scoreboard text.
-- **Spectators**: none, sparse or dense seated figures on the stands. They render as
-  background (ID 0): people outside the court are hard negatives, not labelled players.
+- **Spectators**: none. Synthetic material contains no spectators (project decision,
+  November 2026); stands stay empty. The worker still supports seated figures, and the
+  random draw is kept so other choices of existing seeds do not change.
 - **Team benches**: in three of four scenes per team, 3–7 seated substitutes in the team
   kit, and often a standing coach, in front of the far stands (y ≈ 9 m). They are
-  background as well: the label policy counts only people on the court as `player`. If
-  your real labels also mark bench players, say so; this is a one-line policy change.
+  background: the label policy counts only people on the court as `player` or
+  `referee`. Real footage handles people at the sideline (bench, table officials,
+  coaches) the same way, by excluding everything outside the court boundary.
 - **Motion**: frames are 0.2 s apart. Athletes move with situation-dependent velocities
   (up to about 6 m/s in transition, static at free throws and jump balls) and the ball
   follows its event, so consecutive frames differ while instance IDs stay stable.
 - **Kit**: players wear a tank-top jersey over a skin torso, with deep armholes, a scoop
   neckline, wide shoulder panels, contrasting piping and the number front and back, and
-  knee-length shorts joined at the seat; referees wear a crew-neck striped shirt with
-  short sleeves. A believable 3D cut matters for photorealistic repainting: image-edit
-  models keep the silhouette they are given.
+  knee-length shorts joined at the seat. A believable 3D cut matters for photorealistic
+  repainting: image-edit models keep the silhouette they are given.
+- **Referees and ball** (layout schema 1.2): each scene samples a referee kit (grey with
+  black sleeves, orange, black with neon accents or black/white stripes, always with long
+  black trousers) that differs from both team kits, and a ball design (classic orange,
+  orange/ivory, orange/black, dark brown). See [balls and referee kits](EQUIPMENT.md).
 - **Animation** (layout schema 1.1): every frame has its own joints. Runners cycle their
   legs and swing the opposite arm with a stride from their speed and face where they run;
   defenders shuffle; dribblers push the ball down in time with the bounce; passers extend
@@ -83,8 +88,10 @@ the plan's version, situation, ball event and checksum as an asset.
 
 ## Camera presets
 
-Recipes with `"schema_version": "1.1"` may set `"camera"`. Version 1.0 recipes keep
-the broadcast camera and reject the field.
+Recipes with `"schema_version": "1.1"` or `"1.2"` may set `"camera"`. Version 1.0
+recipes keep the broadcast camera and reject the field. Version 1.2 also accepts
+`"equipment_profile"` (`international`, the default, or `germany`); see
+[balls and referee kits](EQUIPMENT.md#profiles).
 
 - `broadcast` (default): elevated perspective camera about 20 m behind the near
   sideline, 9–11 m high, 35 mm lens, drifting slightly between frames.

@@ -17,8 +17,11 @@ import math
 import random
 from dataclasses import dataclass, replace
 
-LAYOUT_SCHEMA = "1.1"
-"""1.1: per-frame joints (animated poses, real jump arcs) and team benches."""
+from just_a_sports_dataset_generator.sports.equipment import choose_ball, choose_referee_kit
+
+LAYOUT_SCHEMA = "1.2"
+"""1.1: per-frame joints (animated poses, real jump arcs) and team benches.
+1.2: ``equipment`` with the match ball design and the referee kit (docs/EQUIPMENT.md)."""
 COURT_HALF_LENGTH, COURT_HALF_WIDTH = 14.0, 7.5
 RIM_X, RIM_Z, BALL_RADIUS = 12.425, 3.05, 0.12
 FRAME_INTERVAL = 0.2
@@ -396,7 +399,9 @@ def _situation(
     return offense, defense, 0.3
 
 
-def plan_scene(seed: int, frames: int) -> dict[str, object]:
+def plan_scene(
+    seed: int, frames: int, equipment_profile: str = "international"
+) -> dict[str, object]:
     """Plan one basketball scene. Same seed and frame count, same layout."""
     rng = random.Random(f"basketball-layout:v1.1:{seed}")
     situation = rng.choices(SITUATIONS, SITUATION_WEIGHTS)[0]
@@ -507,6 +512,16 @@ def plan_scene(seed: int, frames: int) -> dict[str, object]:
         motions,
     )
     xs = [r[0].x for r in roots.values()]
+    # A separate random stream: adding equipment must not change any earlier layout choice.
+    equipment_rng = random.Random(f"basketball-equipment:v1:{seed}")
+    ball_design = choose_ball(equipment_rng, "basketball", equipment_profile).render_spec()
+    referee_kit = choose_referee_kit(
+        equipment_rng, "basketball", kits, profile=equipment_profile
+    ).render_spec()
+    for athlete in athletes:
+        if athlete["team"] == 2:
+            athlete["kit"] = referee_kit["shirt"]
+            athlete["referee_kit"] = referee_kit
     return {
         "schema_version": LAYOUT_SCHEMA,
         "seed": seed,
@@ -518,6 +533,11 @@ def plan_scene(seed: int, frames: int) -> dict[str, object]:
         "benches": _benches(rng, kits),
         "athletes": athletes,
         "ball": ball,
+        "equipment": {
+            "profile": equipment_profile,
+            "ball": ball_design,
+            "referee_kit": referee_kit,
+        },
     }
 
 
@@ -793,8 +813,9 @@ def _hall(rng: random.Random) -> dict[str, object]:
         "light_energy": round(u(1100, 2600), 1),
         "light_kelvin": round(u(3800, 6500), 0),
         "light_rows": rng.choice((2, 3)),
-        "spectator_density": (
-            round(rng.choice((0.0, u(0.05, 0.3), u(0.3, 0.8))), 3) if style == "arena" else 0.0
-        ),
+        # No spectators in synthetic material (project owner's decision): the draw is kept
+        # so every later choice of an existing seed stays the same, but stands stay empty.
+        "spectator_density": 0.0
+        * (round(rng.choice((0.0, u(0.05, 0.3), u(0.3, 0.8))), 3) if style == "arena" else 0.0),
         "spectator_seed": rng.randrange(2**31),
     }

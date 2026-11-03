@@ -44,7 +44,7 @@ class SchemaTests(unittest.TestCase):
                     main(["export", str(root / "render"), "--output", str(root / "dataset")]), 0
                 )
             cases = {
-                "render-run-v1.1": root / "render/run.json",
+                "render-run-v1.2": root / "render/run.json",
                 "scene-v2.0": root / "render/scene-000000/scene.json",
                 "native-annotations-v1.0": root / "dataset/native/scene-000000/annotations.json",
                 "export-manifest-v2.0": root / "dataset/manifest.json",

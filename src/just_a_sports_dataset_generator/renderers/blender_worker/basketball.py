@@ -644,7 +644,20 @@ def athlete(plan):
     light = 0.88 if sum(plan["kit"]) < 1.8 else 0.05  # lettering contrasts with the kit
     white = material("Socks and lettering", (light, light, light * 0.93), 0.8)
     socks = material("Socks", (0.88, 0.88, 0.82), 0.8)
-    shorts = kit if team < 2 else dark
+    # Referee kit from the equipment catalogue (layout 1.2); older layouts keep the
+    # striped shirt with black shorts.
+    referee = plan.get("referee_kit") if team == 2 else None
+    sleeves, lower, stripes, trousers, stripe_mat = kit, dark, team == 2, False, dark
+    if referee:
+        sleeves = material("Referee sleeves", tuple(referee["sleeves"]), 0.82)
+        lower = material("Referee trousers", tuple(referee["lower_color"]), 0.8)
+        socks = material("Referee socks", tuple(referee["socks"]), 0.8)
+        stripes = referee["pattern"] == "vertical_stripes"
+        trousers = referee["lower"] == "trousers"
+        if referee.get("accent"):
+            stripe_mat = material("Referee accent", tuple(referee["accent"]), 0.7)
+    leg = lower if trousers else skin
+    shorts = kit if team < 2 else lower
     trim = white if team < 2 else dark
     jersey_mesh(kit, identity, upper, drop, skin=skin, trim=trim, armholes=team < 2)
     # Shorts body over the hips: connects both legs like real loose shorts.
@@ -680,12 +693,17 @@ def athlete(plan):
         between(
             limb("Shorts leg", hip, split(j), 0.15, 0.14, shorts, identity, root), get(hip_n), split
         )
+        wide = 1.12 if trousers else 1.0  # trousers hang loosely around thigh and calf
         between(
-            limb("Thigh", split(j), knee, 0.105, 0.080, skin, identity, root), split, get(knee_n)
+            limb("Thigh", split(j), knee, 0.105 * wide, 0.080 * wide, leg, identity, root),
+            split,
+            get(knee_n),
         )
-        at_joint(oval("Knee", knee, (0.078, 0.078, 0.082), skin, identity, root), knee_n)
+        at_joint(oval("Knee", knee, (0.078 * wide,) * 2 + (0.082,), leg, identity, root), knee_n)
         between(
-            limb("Calf", knee, ankle, 0.075, 0.045, skin, identity, root), get(knee_n), get(ankle_n)
+            limb("Calf", knee, ankle, 0.075 * wide, 0.045 * wide, leg, identity, root),
+            get(knee_n),
+            get(ankle_n),
         )
         between(
             limb("Sock", sock_top(j), ankle, 0.050, 0.047, socks, identity, root),
@@ -708,7 +726,7 @@ def athlete(plan):
         at_joint(sole, ankle_n, (0.0, -0.06, 0.026 - ankle[2]))
         shoulder_n, elbow_n, wrist_n = f"{prefix}_shoulder", f"{prefix}_elbow", f"{prefix}_wrist"
         shoulder, elbow, wrist = j[shoulder_n], j[elbow_n], j[wrist_n]
-        cover = skin if team < 2 else kit  # a referee's shoulders are inside the shirt
+        cover = skin if team < 2 else sleeves  # a referee's shoulders are inside the shirt
         at_joint(
             oval("Shoulder", shoulder, (0.098, 0.098, 0.11), cover, identity, root), shoulder_n
         )
@@ -722,7 +740,7 @@ def athlete(plan):
             def sleeve_end(joints, shoulder_n=shoulder_n, elbow_n=elbow_n):
                 return along(joints[shoulder_n], joints[elbow_n], 0.5)
 
-            sleeve = limb("Sleeve", shoulder, sleeve_end(j), 0.1, 0.085, kit, identity, root)
+            sleeve = limb("Sleeve", shoulder, sleeve_end(j), 0.1, 0.085, sleeves, identity, root)
             between(sleeve, get(shoulder_n), sleeve_end)
         at_joint(oval("Elbow", elbow, (0.061, 0.061, 0.061), skin, identity, root), elbow_n)
         between(
@@ -756,7 +774,7 @@ def athlete(plan):
         for side in (-1, 1):
             trim = [(side * 0.203, 0, 0.96 - drop), (side * 0.25, 0, 1.44 - drop)]
             line("Uniform trim", trim, white, 0.012, identity, upper)
-    else:
+    elif stripes:
         for side in (-1, 1):  # front and back: referee shirts are striped all around
             for x in (-0.15, -0.075, 0, 0.075, 0.15):
                 # On the shirt's surface (the shirt hangs 6-10 % away from the torso).
@@ -764,7 +782,11 @@ def athlete(plan):
                     (x, side * (torso_radius(z)[1] * 1.1 + 0.004), z - drop)
                     for z in (1.0, 1.15, 1.3, 1.44)
                 ]
-                line("Referee stripe", stripe, dark, 0.014, identity, upper)
+                line("Referee stripe", stripe, stripe_mat, 0.014, identity, upper)
+    elif referee and referee.get("accent"):
+        for side in (-1, 1):  # accent piping down the shirt's sides
+            piping = [(side * 0.215, 0, 0.98 - drop), (side * 0.26, 0, 1.42 - drop)]
+            line("Referee piping", piping, stripe_mat, 0.02, identity, upper)
     RIGS[identity] = (upper, drop, updaters)
     SKELETONS[identity] = (root, {name: j[name] for name in OPENPOSE_18})
     return root
@@ -832,9 +854,9 @@ def bench_people(people):
             )
 
 
-def ball():
-    orange = material("Basketball leather", (0.72, 0.19, 0.027), 0.78)
-    nodes, links = orange.node_tree.nodes, orange.node_tree.links
+def leather(name, color):
+    mat = material(name, color, 0.78)
+    nodes, links = mat.node_tree.nodes, mat.node_tree.links
     noise = nodes.new("ShaderNodeTexNoise")
     noise.inputs["Scale"].default_value = 150
     bump = nodes.new("ShaderNodeBump")
@@ -842,10 +864,24 @@ def ball():
     bump.inputs["Distance"].default_value = 0.003
     links.new(noise.outputs["Fac"], bump.inputs["Height"])
     links.new(bump.outputs[0], nodes.get("Principled BSDF").inputs["Normal"])
+    return mat
+
+
+def ball(design=None):
+    """Basketball in the planned design (layout 1.2); classic orange for older layouts."""
+    design = design or {}
+    base = leather("Basketball leather", tuple(design.get("base") or (0.72, 0.19, 0.027)))
     root = bpy.data.objects.new("Ball root", None)
     bpy.context.collection.objects.link(root)
-    oval("Basketball", (0, 0, 0), (0.12,) * 3, orange, 1, root)
-    seam = material("Ball seams", (0.014, 0.010, 0.008), 0.9)
+    sphere = oval("Basketball", (0, 0, 0), (0.12,) * 3, base, 1, root)
+    if design.get("panels"):
+        # Two-tone: the panel colour covers the polar half of alternate octants, about a
+        # quarter of the surface, close to the share of real two-tone balls.
+        sphere.data.materials.append(leather("Basketball panels", tuple(design["panels"])))
+        for poly in sphere.data.polygons:
+            c = poly.center  # unit sphere before the object scale
+            poly.material_index = 1 if c.x * c.y * c.z > 0 and abs(c.z) > 0.45 else 0
+    seam = material("Ball seams", tuple(design.get("seams") or (0.014, 0.010, 0.008)), 0.9)
     for axis in range(3):
         points = []
         for i in range(96):
@@ -1065,7 +1101,7 @@ def main():
     hoop(1, 41, white, steel)
     athletes = [(plan, athlete(plan)) for plan in layout["athletes"]]
     bench_people(layout.get("benches", []))
-    ball_root = ball()
+    ball_root = ball(layout.get("equipment", {}).get("ball"))
     preset = job.get("camera", "broadcast")
     camera_data = bpy.data.cameras.new("Dataset camera")
     camera = bpy.data.objects.new("Dataset camera", camera_data)

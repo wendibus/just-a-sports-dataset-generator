@@ -2,7 +2,7 @@
 
 Cross-platform, open-source generator for photorealistic synthetic sports datasets with automatic ground-truth annotations for computer vision.
 
-> Project status: early implementation. Version 0.4 adds local **3D basketball scenes in Blender 5.x**: a court, ten procedural athletes, one or two referees, ball, hoops, lighting, and visible-pixel labels from the same render. Each scene varies the game situation, poses, ball state, hall, light, spectators and motion between frames. The Mac starter offers quality selection, a local progress page, and RGB/mask previews. The figures are procedural and visibly synthetic; photorealism and training benefit are **not yet validated**. COCO handoff is tested through Reco Trainer's actual importer and RF-DETR training-data preparation.
+> Project status: early implementation. Version 0.4 adds local **3D basketball scenes in Blender 5.x**: a court, ten procedural athletes, one or two referees, ball, hoops, lighting, and visible-pixel labels from the same render. Each scene varies the game situation, poses, ball state, ball design, referee kit, hall, light and motion between frames; stands stay empty. The Mac starter offers quality selection, a local progress page, and RGB/mask previews. The figures are procedural and visibly synthetic; photorealism and training benefit are **not yet validated**. COCO handoff is tested through Reco Trainer's actual importer and RF-DETR training-data preparation.
 
 ## Goals
 
@@ -126,7 +126,7 @@ For a Reco-style full-court panorama, render `examples/basketball-reco.json` (re
 
 Every Blender scene also gets `poses.json` (OpenPose skeletons from the scene geometry). `sports-dataset export-crops outputs/reco --output outputs/crops` turns them into per-person RGB, mask, inpaint-mask and pose crops for pose-guided repainting, and `composite-crops` pastes generated results back without changing the labels. `sports-dataset repaint outputs/reco --output outputs/reco-repaint` does all of it with a local Qwen-Image-Edit-2511, which it installs on first use after showing the download (about 31 GB) and asking; see [pose crops](docs/POSE_CROPS.md).
 
-Open `outputs/Vorschau/index.html`. Use `--samples 64` for finer sampling or `--blender /path/to/blender` for a nonstandard installation. CPU rendering is the default; an optional `--device auto` tries Metal on macOS. See [the basketball guide](docs/BASKETBALL.md) for scope, annotation semantics, reproducibility, and limitations.
+Open `outputs/Vorschau/index.html`. Use `--samples 64` for finer sampling or `--blender /path/to/blender` for a nonstandard installation. CPU rendering is the default; an optional `--device auto` tries Metal on macOS. See [the basketball guide](docs/BASKETBALL.md) for scope, annotation semantics, reproducibility, and limitations. Ball designs and referee kits for basketball, football and futsal are catalogued in [balls and referee kits](docs/EQUIPMENT.md); only basketball renders them so far.
 
 The old rectangle fixture remains available for fast pipeline tests:
 

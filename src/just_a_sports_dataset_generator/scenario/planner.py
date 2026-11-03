@@ -7,14 +7,17 @@ from typing import Any, cast
 
 from just_a_sports_dataset_generator.core import (
     CAMERA_PRESETS,
+    EQUIPMENT_PROFILES,
     SPORTS,
     DatasetRecipe,
     SceneJob,
     labels_for_sport,
 )
 
-SUPPORTED_SCHEMA_VERSIONS = ("1.0", "1.1")
-"""1.1 adds the optional ``camera`` preset; 1.0 recipes keep the broadcast camera."""
+SUPPORTED_SCHEMA_VERSIONS = ("1.0", "1.1", "1.2")
+"""1.1 adds the optional ``camera`` preset; 1.0 recipes keep the broadcast camera.
+1.2 adds the optional ``equipment_profile`` (default ``international``)."""
+OPTIONAL_FIELDS = {"1.0": set[str](), "1.1": {"camera"}, "1.2": {"camera", "equipment_profile"}}
 SUPPORTED_ANNOTATIONS = frozenset(
     {"bounding_boxes", "instance_masks", "semantic_masks", "keypoints", "depth"}
 )
@@ -53,7 +56,7 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
     if raw.get("schema_version") not in SUPPORTED_SCHEMA_VERSIONS:
         raise RecipeError(f"unsupported schema_version: {raw.get('schema_version')!r}")
     schema_version = cast(str, raw["schema_version"])
-    optional = {"camera"} if schema_version == "1.1" else set[str]()
+    optional = OPTIONAL_FIELDS[schema_version]
     missing = sorted(required - raw.keys())
     unknown = sorted(raw.keys() - required - optional)
     if missing:
@@ -63,6 +66,9 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
     camera = raw.get("camera", "broadcast")
     if camera not in CAMERA_PRESETS:
         raise RecipeError(f"camera must be one of: {', '.join(CAMERA_PRESETS)}")
+    profile = raw.get("equipment_profile", "international")
+    if profile not in EQUIPMENT_PROFILES:
+        raise RecipeError(f"equipment_profile must be one of: {', '.join(EQUIPMENT_PROFILES)}")
     if not isinstance(raw["name"], str) or not raw["name"].strip():
         raise RecipeError("name must be a non-empty string")
     if not isinstance(raw["sport"], str) or not raw["sport"].strip():
@@ -102,6 +108,7 @@ def load_recipe(path: str | Path) -> DatasetRecipe:
         annotations=tuple(annotations),
         labels=labels_for_sport(sport),
         camera=cast(str, camera),
+        equipment_profile=cast(str, profile),
     )
 
 
@@ -123,6 +130,7 @@ def plan_jobs(recipe: DatasetRecipe) -> tuple[SceneJob, ...]:
             annotations=recipe.annotations,
             labels=recipe.labels,
             camera=recipe.camera,
+            equipment_profile=recipe.equipment_profile,
         )
         for index in range(recipe.scenes)
     )
