@@ -164,10 +164,63 @@ Replacement candidates are actual photographs of football venues, with their
 original markings and goal perspective intact. The current local visual selection
 contains an elevated full-field view (Wikideas1, CC0, UW-L soccer field 02) and a
 ground-level amateur view (Dejan Krsmanovic, CC BY 2.0, Subsidiary Football Yard).
-They are only candidates: neither has completed placement calibration or goal-mask
-tracing. Do not remove the rejection marker merely because an image was copied.
+The user selected B (ground-level amateur view). The source photograph is now
+staged with an estimated local scale and manually reviewed detection boxes;
+measured calibration, fine goal masks and the photographic person pilot remain pending. Do not remove the rejection marker merely because an image was copied.
 Select the visual basis, establish perspective/scale, trace every visible target
 goal and review a labelled person composite before enabling a production run.
 
 Sources: [UW-L photograph](https://commons.wikimedia.org/wiki/File:UW-L_soccer_field_02.jpg),
 [amateur photograph](https://commons.wikimedia.org/wiki/File:Subsidiary_Football_Yard_(43019524354).jpg).
+
+
+## Selected real photograph B: separate staging
+
+`prepare_football_photo.py` stages the selected **real photograph**, without Blender,
+Qwen, BiRefNet, downloads or any training-process control. It verifies the approved
+original SHA-256 and dimensions, retains the original, crops only the upper sky
+(native crop 0,1250,7670,3407), and resizes to 3200 × 900. It preserves the photographed
+turf, buildings, markings, goal geometry and natural light. This is a ground-level
+training yard, not a full-pitch broadcast view. Avoid claiming an 11-a-side full-field
+simulation from this image.
+
+```sh
+PYTHONPATH=src python scripts/prepare_football_photo.py /path/to/Fussball-Amateur-B-10009 \
+  --photo /path/to/B-Echter-Platz-Amateur.jpg
+```
+
+The new folder is independent of the rejected venue and all basketball/Futsal snapshots.
+Publication is staged; existing output/staging folders are refused. The version-1.0
+`football-photo-preparation` schema records image transforms, checksums, rights,
+estimated placement scale, five manual goal boxes and unfinished work. This is a
+preparation contract, **not** a hall-run config or a production export. It supplies
+no launch command and keeps `venue-rejected.json` in place so the existing runner
+cannot accidentally treat the new photo as an accepted, calibrated venue.
+
+The near white goal, farther white goal, blue training goal and two red mini-goal regions (one behind the near net) all
+have manual detection boxes in `goal-box-review.json`. COCO category order remains
+`ball`, `player`, `goalkeeper`, `referee`, `goal`; category 5 is used for each goal.
+Overlapping boxes are legitimate. This review fixture has no segmentation fields:
+boxes are **not** net-thread or visible-pixel masks. Do not rasterize whole goal boxes
+as claimed segmentation ground truth. Fine masks and photo-aware occlusion/export
+integration remain required before enabling the production runner.
+
+Scale is a local hypothesis: the near aperture is presumed 2.44 m high and the
+camera 1.65 m high. These dimensions, level and lens distortion are not measured;
+the source is panoramic and its EXIF focal length is insufficient for a metric
+camera. Proposed foot points lie only in the grassy foreground, below the near
+net, so future people/balls are in front of it. Estimated scale grows toward the
+camera. Do not reuse the 22 m elevated prototype camera, person-view prompts,
+23-person roster, goal masks or its pixel boxes. The first ten pilot requests use
+four field players, one keeper and one referee, ground-level views, warm diffuse
+light, matched contact shadows, closer crops and controlled overlap. They retain
+the agreed 40/40/20 gender scene distribution and 70/20/10 ball-count buckets.
+They are requests only; no person photos have been generated or accepted yet.
+
+Photograph: **Subsidiary Football Yard**, Dejan Krsmanovic, **CC BY 2.0**.
+[Source and attribution](https://commons.wikimedia.org/wiki/File:Subsidiary_Football_Yard_(43019524354).jpg),
+[license](https://creativecommons.org/licenses/by/2.0/).
+The local `ATTRIBUTION.md`, source link, author, license link and change notice
+must accompany future derived composites/datasets. The project's Apache-2.0 code
+license does not replace the photograph's license. The source photograph and
+rendered preparation outputs are not committed to Git.
