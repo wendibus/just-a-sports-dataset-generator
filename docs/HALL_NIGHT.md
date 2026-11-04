@@ -131,3 +131,11 @@ In Reco Trainer select `dataset/coco/` and sport basketball. Its current label i
 imports detection boxes and rebuilds its own splits: it does not preserve these grouped,
 identity-separated export splits. Keep the original export for any evaluation needing
 those guarantees. A successful import or mask check is not a trained-model accuracy test.
+
+## Illustrated references and proposed training variants
+
+See [basketball referee and ball references](BASKETBALL_REFERENCES.md) for the
+three user-supplied charts and their local illustrated supplement.
+[Economical data augmentation](DATA_AUGMENTATION.md) describes existing effects,
+proposed mild blur/exposure/compression variants, and label/split requirements.
+These documentation additions do not activate new augmentation or alter frozen runs.
