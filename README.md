@@ -12,7 +12,7 @@ Qwen/BiRefNet people with the supplied hall photograph. Futsal supports an exact
 and visible-pixel COCO masks for RF-DETR. The prepared local description embeds
 the user-supplied referee and ball reference charts. Training benefit remains
 unvalidated. This Futsal adapter was prioritized by explicit user request; a full
-football renderer remains planned. An experimental [outdoor football preparation](docs/FOOTBALL.md) now supplies a neutral procedural grass pitch, its own camera, goalkeeper/referee profiles and exact COCO plans. A local CPU venue upgrade adds CC0 photographic surroundings/turf detail with matching 3D goal masks. No football photographic pilot or accuracy validation has been performed. See [basketball batch instructions](docs/HALL_NIGHT.md).
+football renderer remains planned. An experimental [outdoor football preparation](docs/FOOTBALL.md) now supplies a neutral procedural grass pitch, its own camera, goalkeeper/referee profiles and exact COCO plans. A local CPU photo-projection experiment has matching 3D goal masks, but its visual result was rejected by the user and is not approved for training; replacement venue-photo selection is pending. No football photographic pilot or accuracy validation has been performed. See [basketball batch instructions](docs/HALL_NIGHT.md).
 
 ## Goals
 

@@ -149,3 +149,25 @@ The request contains `schema_version: "1.0"`, `assets`, `output`, `percentage: 1
 accepted for installation. RGB, raw goal IDs, camera checks, source provenance and
 verification results are retained locally. The existing GPL-3.0-or-later worker
 boundary applies to the new Blender worker; host code remains Apache-2.0.
+
+
+## Venue quality decision: rejected
+
+The user rejected the 4 November photo-projected landscape/field result as
+unconvincing. It is **not an accepted training background**, despite passing the
+geometric and mask checks. Those checks establish annotation consistency, not
+photorealism. The local football preparation is marked `venue-rejected.json`;
+launchers and preflight refuse generation while that marker exists. Basketball,
+Futsal and Reco jobs are unaffected.
+
+Replacement candidates are actual photographs of football venues, with their
+original markings and goal perspective intact. The current local visual selection
+contains an elevated full-field view (Wikideas1, CC0, UW-L soccer field 02) and a
+ground-level amateur view (Dejan Krsmanovic, CC BY 2.0, Subsidiary Football Yard).
+They are only candidates: neither has completed placement calibration or goal-mask
+tracing. Do not remove the rejection marker merely because an image was copied.
+Select the visual basis, establish perspective/scale, trace every visible target
+goal and review a labelled person composite before enabling a production run.
+
+Sources: [UW-L photograph](https://commons.wikimedia.org/wiki/File:UW-L_soccer_field_02.jpg),
+[amateur photograph](https://commons.wikimedia.org/wiki/File:Subsidiary_Football_Yard_(43019524354).jpg).

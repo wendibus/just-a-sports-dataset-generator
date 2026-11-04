@@ -66,6 +66,15 @@ class NaturalVenueTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "camera"):
                 prepare_layers(root / "render", root / "out")
 
+    def test_rejected_venue_cannot_pass_preflight(self):
+        from run_hall_night import preflight
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "venue-rejected.json", {"status": "rejected_by_user"})
+            with self.assertRaisesRegex(ValueError, "Venue rejected"):
+                preflight(root, {})
+
     def test_started_roots_cannot_be_changed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

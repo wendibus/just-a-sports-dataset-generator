@@ -131,6 +131,11 @@ def dashboard(root, state):
 
 
 def preflight(root, config):
+    if (root / "venue-rejected.json").exists():
+        raise ValueError(
+            "Venue rejected by the user; select and calibrate a replacement before generation"
+        )
+
     from jsonschema import Draft202012Validator
 
     version = config["schema_version"]
