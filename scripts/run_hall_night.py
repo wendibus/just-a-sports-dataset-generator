@@ -27,6 +27,10 @@ from PIL import Image
 
 
 def sport_adapter(config):
+    if config.get("sport") == "football":
+        from hall_night import football
+
+        return football
     if config.get("sport") == "futsal":
         from hall_night import futsal
 
@@ -140,7 +144,7 @@ def preflight(root, config):
 
     if list(labels_for_sport(config.get("sport", "basketball"))) != (
         ["ball", "player", "goalkeeper", "referee", "goal"]
-        if config.get("sport") == "futsal"
+        if config.get("sport") in ("futsal", "football")
         else ["ball", "player", "referee", "hoop"]
     ):
         raise ValueError("Reco taxonomy changed")
@@ -206,9 +210,17 @@ def preflight(root, config):
         "export_sha256": sha(Path(__file__).with_name("hall_night") / "export.py"),
         "matte_checks_sha256": sha(Path(__file__).with_name("hall_night") / "matte_checks.py"),
         "futsal_adapter_sha256": sha(Path(__file__).with_name("hall_night") / "futsal.py")
-        if config.get("sport") == "futsal"
+        if config.get("sport") in ("futsal", "football")
         else None,
-        "goals": read(Path(config["goals"])) if config.get("sport") == "futsal" else None,
+        "goals": read(Path(config["goals"]))
+        if config.get("sport") in ("futsal", "football")
+        else None,
+        "football_adapter_sha256": sha(Path(__file__).with_name("hall_night") / "football.py")
+        if config.get("sport") == "football"
+        else None,
+        "pitch_sha256": sha(Path(__file__).with_name("hall_night") / "football_pitch.py")
+        if config.get("sport") == "football"
+        else None,
         "photo_worker_sha256": sha(Path(__file__).with_name("hall_night") / "photo_worker.py"),
     }
     fingerprint = root / "run-fingerprint.json"
@@ -230,7 +242,7 @@ def generate_assets(root, config, deadline, pilot=False):
     write(cache / "asset-plan.json", {"schema_version": "1.0", "assets": plan})
     if pilot:
         wanted = {"p-woman-red-00", "p-woman-yellow-01", "p-man-red-02", "p-man-yellow-00", "r-04"}
-        if config.get("sport") == "futsal":
+        if config.get("sport") in ("futsal", "football"):
             wanted = {
                 "p-woman-red-00",
                 "p-woman-yellow-01",
@@ -346,7 +358,11 @@ def generate_assets(root, config, deadline, pilot=False):
 def render_all(root, config, plans, assets, deadline, pilot=False):
     cache = Path(config.get("cache", root / "cache"))
     balls = read(cache / "balls.json")["assets"]
-    goals = read(Path(config["goals"]))["assets"] if config.get("sport") == "futsal" else []
+    goals = (
+        read(Path(config["goals"]))["assets"]
+        if config.get("sport") in ("futsal", "football")
+        else []
+    )
     for asset in assets + balls + goals:
         if sha(asset_path(cache, asset["file"])) != asset["sha256"]:
             raise ValueError("Cutout changed since asset QC")
@@ -403,7 +419,7 @@ def main():
     root = args.root.resolve()
     config = read(root / "config.json")
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
-    if config.get("sport") == "futsal" and args.stage != "verify":
+    if config.get("sport") in ("futsal", "football") and args.stage != "verify":
         from hall_night.resources import wait_for_other_runs
 
         wait_for_other_runs(root)
@@ -450,9 +466,9 @@ def main():
                 destination.mkdir(exist_ok=True)
                 settings = {**config, "cache": str(root / "cache")}
                 plans = make_plans(12, config["seed"])
-                if config.get("sport") == "futsal":
+                if config.get("sport") in ("futsal", "football"):
                     for plan in plans:
-                        plan["sport"] = "futsal"
+                        plan["sport"] = config["sport"]
                 # Guarantee all three composition types are present in the visual pilot.
                 for i, plan in enumerate(plans):
                     plan["gender_mode"] = ("women", "men", "mixed")[i % 3]

@@ -39,6 +39,8 @@ def freeze(root: Path, config):
         copy_file(repo / "docs/HALL_NIGHT.md", stage / "docs/HALL_NIGHT.md")
         if config.get("sport") == "futsal":
             copy_file(repo / "docs/FUTSAL_HALL.md", stage / "docs/FUTSAL_HALL.md")
+        if config.get("sport") == "football":
+            copy_file(repo / "docs/FOOTBALL.md", stage / "docs/FOOTBALL.md")
         copy_file(repo / "scripts/run_hall_night.py", stage / "scripts/run_hall_night.py")
         copy_file(repo / "scripts/foreground_masks.py", stage / "scripts/foreground_masks.py")
         shutil.copytree(

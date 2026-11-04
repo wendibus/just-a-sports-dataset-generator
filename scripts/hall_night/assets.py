@@ -141,7 +141,11 @@ def prepare_references(config, root: Path, plan):
         # No auxiliary basket in this low, central wall/floor lighting reference.
         context = (
             raw.convert("RGB")
-            .crop((1300, 380, 1820, 900))
+            .crop(
+                (1280, 420, 1920, 900)
+                if config.get("sport") == "football"
+                else (1300, 380, 1820, 900)
+            )
             .resize((640, 640), Image.Resampling.LANCZOS)
         )
     for asset in plan:
@@ -310,14 +314,14 @@ def finalize_assets(config, root: Path, plan):
     write(
         root / "library.json",
         {
-            "schema_version": "2.0" if config.get("sport") == "futsal" else "1.0",
+            "schema_version": "2.0" if config.get("sport") in ("futsal", "football") else "1.0",
             "assets": accepted,
             "rejected": rejected,
             "generation": "Qwen-Image-Edit-2511 Q4_K_M + Lightning (Apache-2.0); BiRefNet (MIT), local",
             "traits": "Prompted attributes, not independently inferred demographic ground truth",
         },
     )
-    version = "2.0" if config.get("sport") == "futsal" else "1.0"
+    version = "2.0" if config.get("sport") in ("futsal", "football") else "1.0"
     validate(f"hall-photo-library-v{version}.json", read(root / "library.json"))
     contact_sheet(root, accepted)
     return accepted, rejected

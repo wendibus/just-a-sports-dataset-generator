@@ -263,13 +263,17 @@ def choose_roster(assets, plan, rng, pilot):
     return roster
 
 
-def make_layers(plan, assets, balls, cache, images, pilot, attempt):
+def make_layers(plan, assets, balls, cache, images, pilot, attempt, profile=None):
+    profile = profile or {}
+    project_ground = profile.get("ground_point", ground_point)
+    ppm = profile.get("pixels_per_metre", pixels_per_metre)
+    match = profile.get("matched_person", matched_person)
     rng = random.Random(seed_for(plan["seed"], f"placement-{attempt}"))
     people = []
     counters = {"player": 10, "goalkeeper": 30, "referee": 40}
     classes = {"player": 1, "goalkeeper": 2, "referee": 3}
     previous = None
-    for a in choose_roster(assets, plan, rng, pilot):
+    for a in profile.get("choose_roster", choose_roster)(assets, plan, rng, pilot):
         role = a["label"]
         ident = counters[role]
         counters[role] += 1
@@ -280,16 +284,28 @@ def make_layers(plan, assets, balls, cache, images, pilot, attempt):
         else:
             u, v = rng.uniform(0.16, 0.84), rng.uniform(0.22, 0.85)
             if ident == 11 and previous is not None:
-                u, v = previous[0] + 0.012, min(0.88, previous[1] + 0.045)
+                u, v = (
+                    previous[0] + profile.get("overlap_u", 0.012),
+                    min(0.88, previous[1] + profile.get("overlap_v", 0.045)),
+                )
             if ident == 10:
                 previous = (u, v)
-        ground = ground_point(u, v)
+        ground = project_ground(u, v)
         if a["id"] not in images:
             with Image.open(asset_path(cache, a["file"])) as raw:
                 images[a["id"]] = raw.copy()
-        rgba = matched_person(images[a["id"]], ground, rng)
+        rgba = match(images[a["id"]], ground, rng)
         identity = ObjectIdentity(ident, classes[role], role)
-        rgb, alpha, pos = place_layer(PhotoLayer(identity, rgba, ground, person_height(a, ground)))
+        rgb, alpha, pos = place_layer(
+            PhotoLayer(
+                identity,
+                rgba,
+                ground,
+                round(ppm(ground) * a["height_m"] * a["extent"])
+                if profile
+                else person_height(a, ground),
+            )
+        )
         people.append(
             Layer(
                 identity,
@@ -313,7 +329,11 @@ def make_layers(plan, assets, balls, cache, images, pilot, attempt):
     # Goal net/post alpha participates in depth ordering, including see-through mesh.
     goals = read(cache / "goals.json")["assets"]
     for i, a in enumerate(goals):
-        ground = ground_point(0.025 if i == 0 else 0.975, 0.50)
+        ground = (
+            tuple(a["ground_pixel"])
+            if "ground_pixel" in a
+            else ground_point(0.025 if i == 0 else 0.975, 0.50)
+        )
         if a["id"] not in images:
             with Image.open(asset_path(cache, a["file"])) as raw:
                 images[a["id"]] = raw.copy()
@@ -322,7 +342,7 @@ def make_layers(plan, assets, balls, cache, images, pilot, attempt):
         if not bbox:
             raise ValueError("Empty goal asset")
         rgba = rgba.crop(bbox)
-        height = round(pixels_per_metre(ground) * 2.08)
+        height = rgba.height if "position_pixel" in a else round(ppm(ground) * 2.08)
         rgba = rgba.resize(
             (round(rgba.width * height / rgba.height), height), Image.Resampling.LANCZOS
         )
@@ -332,13 +352,15 @@ def make_layers(plan, assets, balls, cache, images, pilot, attempt):
                 ObjectIdentity(200 + i, 4, "goal"),
                 rgba.convert("RGB"),
                 alpha,
-                (ground[0] - rgba.width // 2, ground[1] - height),
+                tuple(a["position_pixel"])
+                if "position_pixel" in a
+                else (ground[0] - rgba.width // 2, ground[1] - height),
                 0.50,
                 ground,
                 a["id"],
                 {
-                    "opening_m": [3, 2],
-                    "depth_m": 1,
+                    "opening_m": a.get("opening_m", [3, 2]),
+                    "depth_m": a.get("depth_m", 1),
                     "model": "procedural goal; projected visual scale",
                 },
             )
@@ -352,7 +374,10 @@ def make_layers(plan, assets, balls, cache, images, pilot, attempt):
     )
     for i in range(n):
         person = rng.choice([p for p in people if p.identity.label in ("player", "goalkeeper")])
-        radius = max(5, round(pixels_per_metre(person.ground) * 0.1003))
+        radius = max(
+            profile.get("min_ball_radius", 5),
+            round(ppm(person.ground) * profile.get("ball_radius_m", 0.1003)),
+        )
         hidden = plan["occlude_ball"] and i == 0
         airborne = rng.random() < 0.15
         if hidden:

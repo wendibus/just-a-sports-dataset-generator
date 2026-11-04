@@ -200,6 +200,10 @@ def choose_roster(assets, plan, rng, pilot):
 
 
 def make_layers(plan, assets, balls, cache, images, pilot, attempt):
+    if plan.get("sport") == "football":
+        from .football import make_layers as football_layers
+
+        return football_layers(plan, assets, balls, cache, images, pilot, attempt)
     if plan.get("sport") == "futsal":
         from .futsal import make_layers as futsal_layers
 
@@ -564,12 +568,14 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
                     }
                     for l in layers
                 ],
-                "annotation_semantics": "Visible alpha pixels after depth composition and crop clipping; Futsal goal net holes retain background pixels."
-                if sport == "futsal"
+                "annotation_semantics": "Visible alpha pixels after depth composition and crop clipping; Goal net holes retain background pixels."
+                if sport in ("futsal", "football")
                 else "Photo cutout alpha and crop clipping; background hoops use manual board/rim/net envelopes.",
                 "scale_calibration": {
-                    "estimated_camera_height_m": 2.4,
-                    "method": "foot-point distance from the rectified image horizon",
+                    "estimated_camera_height_m": 22.0 if sport == "football" else 2.4,
+                    "method": "known procedural pinhole camera"
+                    if sport == "football"
+                    else "foot-point distance from the rectified image horizon",
                     "metric_ground_truth": False,
                 },
             },
@@ -583,7 +589,9 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
                 stage / f"scene-{frame['frame_index']:03d}.json",
                 {
                     "schema_version": "2.0",
-                    "renderer": "local.hall-photo-composite",
+                    "renderer": "local.football-photo-composite"
+                    if sport == "football"
+                    else "local.hall-photo-composite",
                     "renderer_version": "1.0",
                     "job_id": plan["id"] + f"-v{frame['frame_index']}",
                     "sport": sport,
@@ -592,10 +600,13 @@ def render_scene(config, root, plan, assets, balls, images, pilot, deadline):
                     "resolution": {"width": size[0], "height": size[1]},
                     "requested_annotations": ["bounding_boxes", "instance_masks"],
                     "annotation_semantics": "Visible photo-alpha pixels and procedural goal alpha; no original Blender human labels/keypoints reused."
-                    if sport == "futsal"
+                    if sport in ("futsal", "football")
                     else "Visible photo-alpha pixels; manually annotated background hoops. No original Blender human labels/keypoints reused.",
                     "assets": [
-                        {"id": "hall-background", "sha256": config["background_sha256"]},
+                        {
+                            "id": "pitch-background" if sport == "football" else "hall-background",
+                            "sha256": config["background_sha256"],
+                        },
                         *[
                             {"id": a["id"], "sha256": a["sha256"], "split": a["split"]}
                             for a in assets

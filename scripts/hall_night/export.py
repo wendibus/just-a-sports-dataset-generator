@@ -138,8 +138,12 @@ def export_and_verify(root: Path, config, plans, pilot=False):
         write(
             stage / "manifest.json",
             {
-                "schema_version": "2.0" if sport == "futsal" else "1.0",
-                **({"sport": sport} if sport == "futsal" else {}),
+                "schema_version": "3.0"
+                if sport == "football"
+                else "2.0"
+                if sport == "futsal"
+                else "1.0",
+                **({"sport": sport} if sport in ("futsal", "football") else {}),
                 "format": "hall-photo-coco",
                 "images": image_id,
                 "annotations": annotation_id,
@@ -155,15 +159,19 @@ def export_and_verify(root: Path, config, plans, pilot=False):
                 "person_asset_ids_by_split": {s: sorted(v) for s, v in assets_by_split.items()},
                 "pilot_preview_only": pilot,
                 "limitations": [
-                    "One hall only; real held-out footage required for quality evaluation",
+                    "One procedural outdoor pitch; real held-out football footage required"
+                    if sport == "football"
+                    else "One hall only; real held-out footage required for quality evaluation",
                     "Photographic 2.5D composites, not physical simulation",
                     "Requested demographics and poses need visual asset review",
-                    "Goal masks follow procedural post/net alpha; hall calibration is estimated"
-                    if sport == "futsal"
+                    "Goal masks follow procedural post/net alpha; human pose proportions remain approximate"
+                    if sport in ("futsal", "football")
                     else "Static hoop envelopes are manually traced; photographic net holes are approximate",
                     "Reco imports boxes and rebuilds its splits; retain this export for grouped evaluation",
                 ],
-                "rights": "Source hall and ball reference sheets supplied by the user; no redistribution rights asserted.",
+                "rights": "Pitch and goals are original procedural project output; reference charts supplied by the user with redistribution rights not asserted."
+                if sport == "football"
+                else "Source hall and ball reference sheets supplied by the user; no redistribution rights asserted.",
             },
         )
         verify(stage)

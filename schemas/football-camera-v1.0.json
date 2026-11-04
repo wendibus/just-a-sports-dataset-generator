@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Neutral football camera v1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "field_m": {
+      "const": [
+        105,
+        68
+      ]
+    },
+    "camera_position_m": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
+    "look_at_m": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
+    "focal_px": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "principal_point_px": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number"
+      }
+    },
+    "resolution": {
+      "const": [
+        3200,
+        900
+      ]
+    },
+    "source": {
+      "type": "string"
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema_version",
+    "field_m",
+    "camera_position_m",
+    "look_at_m",
+    "focal_px",
+    "principal_point_px",
+    "resolution",
+    "source",
+    "seed"
+  ],
+  "additionalProperties": false
+}
