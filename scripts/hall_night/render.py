@@ -333,6 +333,8 @@ def rasterize(background, layers, sport="basketball"):
     shadow = Image.new("L", rgb.size)
     d = ImageDraw.Draw(shadow)
     for layer in layers:
+        if layer.identity.label == "goal" and layer.metadata.get("shadow_baked"):
+            continue
         x, y = layer.ground
         rx = (
             layer.alpha.height * 0.14

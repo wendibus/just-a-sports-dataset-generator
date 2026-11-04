@@ -93,3 +93,59 @@ Football configuration/export contracts are version 3.0. Person libraries retain
 Futsal 2.0 configs/exports and their frozen snapshots are not migrated in place.
 The neutral pitch/goal code is original project code, Apache-2.0. Installed Qwen
 weights remain Apache-2.0 and BiRefNet MIT; user charts retain their own rights.
+
+## Natural venue upgrade (4 November 2026)
+
+The user's prepared `Fussball-Rasen-10009` folder now supports a more natural,
+locally rendered venue instead of the schematic oval trees and flat graphics.
+The optional isolated Blender worker `football_venue.py` uses two CPU threads,
+Cycles, a real CC0 environment photograph and camera-projected photographic turf
+detail, with a small diffuse contribution for goal shading. It does not run Qwen
+or use a GPU. This is a photo-textured scene composite, not a photograph of a real
+105 × 68 m football venue. Surroundings are an image-based backdrop; their metric
+scale is not ground truth. Human photographic generation/pilot remains separate.
+
+The principal point moves from y=520 to y=660 to include the natural surroundings.
+The placement model, frozen football engine and `camera.json` must change together.
+The worker projection is numerically compared with the compositor at known world
+points. Field dimensions and goal apertures are unchanged.
+
+Goals and their categorical Object Index masks come from the same render. The host
+removes goal support from the background and restores it through goal RGB/alpha
+layers; exact pixel reconstruction is verified. Physical goal shadows remain in
+the background, and the compositor skips its additional ellipse for those goals.
+Antialiased edge coverage is approximated by the categorical ID support, as with
+the existing Blender handoff. No old human masks or boxes are reused.
+
+Only unstarted preparations may be upgraded. Existing fingerprints, person photos,
+pilots, renders or datasets block replacement. `upgrade_football_venue.py` verifies
+the old engine, stages and checks new assets, retains the previous venue/engine in
+`Sicherung-vor-natuerlichem-Platz`, and restores the old configuration, camera,
+engine and goal manifest if publication fails. Basketball, Futsal and Reco processes
+are not modified.
+
+Small source textures are obtained explicitly for this local edit and retained with
+SHA-256 checksums in `venue-natural/assets/sources.json`; they are not bundled in Git:
+
+- [Grass004, Lennart Demes / ambientCG](https://ambientcg.com/view?id=Grass004):
+  colour/normal/roughness maps, CC0-1.0 ([license](https://docs.ambientcg.com/license/)).
+- [Approaching Storm, Greg Zaal / Poly Haven](https://polyhaven.com/a/approaching_storm):
+  2K lighting HDRI and a sharper tonemapped camera photograph, CC0-1.0.
+  Powered by Poly Haven. The live API is only used during asset preparation;
+  rendering and later generation are offline.
+
+Reproduction after those local textures are present:
+
+```sh
+blender --background --factory-startup --disable-autoexec --threads 2 \
+  --python src/just_a_sports_dataset_generator/renderers/blender_worker/football_venue.py \
+  -- /path/to/venue-request.json
+PYTHONPATH=src python scripts/upgrade_football_venue.py /path/to/unstarted-football-run \
+  --assets /path/to/texture-folder --render /path/to/completed-render
+```
+
+The request contains `schema_version: "1.0"`, `assets`, `output`, `percentage: 100`,
+`samples: 32` and `environment_rotation: 0.5`. Half-resolution previews are not
+accepted for installation. RGB, raw goal IDs, camera checks, source provenance and
+verification results are retained locally. The existing GPL-3.0-or-later worker
+boundary applies to the new Blender worker; host code remains Apache-2.0.

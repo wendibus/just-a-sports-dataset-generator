@@ -27,7 +27,7 @@ RF-DETR is the target detector and training framework, owned by Reco Trainer. Th
 | Secure updater (section 5) | specification only, not implemented |
 | Photographic basketball hall batch | implemented, local Qwen/BiRefNet cutouts, grouped COCO |
 | Photographic Futsal hall batch | experimental adapter; exact odd frame budgets, goalkeepers, standing goals; see docs/FUTSAL_HALL.md |
-| Outdoor photographic football preparation | experimental CPU-prepared neutral pitch, own pinhole camera, projected goals and 336 person profiles; photographic pilot pending |
+| Outdoor photographic football preparation | experimental CPU-prepared neutral pitch, own pinhole camera, projected goals, optional CPU photo-textured venue and 336 person profiles; photographic human pilot pending |
 | Full 3D football and other sport renderers | planned; taxonomy available |
 
 Sections 3 and 5 describe the target design so that later work keeps the same contracts;

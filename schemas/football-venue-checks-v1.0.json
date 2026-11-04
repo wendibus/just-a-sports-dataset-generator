@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local natural football venue checks v1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "passed": {
+      "const": true
+    },
+    "camera_max_pixel_error": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.02
+    },
+    "goal_areas": {
+      "type": "object",
+      "required": [
+        "200",
+        "201"
+      ],
+      "properties": {
+        "200": {
+          "type": "integer",
+          "minimum": 50
+        },
+        "201": {
+          "type": "integer",
+          "minimum": 50
+        }
+      },
+      "additionalProperties": false
+    },
+    "exact_rgb_reconstruction": {
+      "const": true
+    },
+    "semantics": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "passed",
+    "camera_max_pixel_error",
+    "goal_areas",
+    "exact_rgb_reconstruction",
+    "semantics"
+  ],
+  "additionalProperties": false
+}

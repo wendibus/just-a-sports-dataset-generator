@@ -362,6 +362,7 @@ def make_layers(plan, assets, balls, cache, images, pilot, attempt, profile=None
                     "opening_m": a.get("opening_m", [3, 2]),
                     "depth_m": a.get("depth_m", 1),
                     "model": "procedural goal; projected visual scale",
+                    "shadow_baked": a.get("shadow_baked", False),
                 },
             )
         )

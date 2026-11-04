@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local natural football venue request v1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "assets": {
+      "type": "string",
+      "minLength": 1
+    },
+    "output": {
+      "type": "string",
+      "minLength": 1
+    },
+    "percentage": {
+      "enum": [
+        50,
+        100
+      ]
+    },
+    "samples": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "environment_rotation": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "schema_version",
+    "assets",
+    "output",
+    "percentage",
+    "samples",
+    "environment_rotation"
+  ],
+  "additionalProperties": false
+}

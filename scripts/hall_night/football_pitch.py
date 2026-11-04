@@ -21,7 +21,7 @@ RIGHT = np.cross(FORWARD, np.array([0.0, 0.0, 1.0]))
 RIGHT /= np.linalg.norm(RIGHT)
 UP = np.cross(RIGHT, FORWARD)
 FOCAL = 2000.0
-CENTER = (1600.0, 520.0)
+CENTER = (1600.0, 660.0)
 
 
 def project(point):
