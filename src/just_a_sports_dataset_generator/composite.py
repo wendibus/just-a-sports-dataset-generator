@@ -1,8 +1,8 @@
 """Paste generated person crops back into a render without touching the ground truth.
 
 Labels are never re-detected. The default ``mask`` blend writes generated pixels only where
-the instance-ID pass shows that person, so every box and mask stays exactly valid; only the
-appearance changes. The ``inpaint`` blend also accepts the dilated band around the person,
+the instance-ID pass shows that person. Stored boxes and masks stay unchanged;
+semantic correctness still needs review. Only the appearance changes. The ``inpaint`` blend also accepts the dilated band around the person,
 but never pixels of another object (players, ball, hoops).
 
 Quality checks reject a crop (keeping the rendered person) when the generator left the
@@ -29,6 +29,12 @@ from just_a_sports_dataset_generator.annotations.scene import (
     safe_file,
     sequence,
     string,
+)
+from just_a_sports_dataset_generator.foreground_quality import (
+    EDGE_TOLERANCE_PX,
+    MIN_FOREGROUND_COVERAGE,
+    MIN_LOCAL_COVERAGE,
+    coverage_metrics,
 )
 from just_a_sports_dataset_generator.storage import new_directory, sha256_file, write_json
 
@@ -221,9 +227,17 @@ def composite_crops(
                             outline = _binary(
                                 raw_silhouette.resize((size, size), Image.Resampling.NEAREST)
                             )
+                        coverage = coverage_metrics(mask, outline)
+                        metrics.update(coverage)
+                        metrics["silhouette_sha256"] = sha256_file(silhouette_files[0])
                         metrics["iou"] = round(_iou(outline, mask), 4)
                         if _iou(outline, mask) < min_iou:
                             reason = reason or "silhouette differs"
+                        if (
+                            coverage["foreground_coverage"] < MIN_FOREGROUND_COVERAGE
+                            or coverage["min_local_coverage"] < MIN_LOCAL_COVERAGE
+                        ):
+                            reason = reason or "missing foreground"
                 if reason:
                     report.append({**entry, **metrics, "status": "rejected", "reason": reason})
                     continue
@@ -265,13 +279,22 @@ def composite_crops(
         write_json(
             staging / "composite.json",
             {
-                "schema_version": "1.0",
+                "schema_version": "1.1" if silhouettes is not None else "1.0",
                 "generator": generator or "unspecified",
                 "blend": blend,
                 "thresholds": {
                     "min_change": min_change,
                     "max_spill": max_spill,
                     "min_iou": min_iou if silhouettes is not None else None,
+                    **(
+                        {
+                            "min_foreground_coverage": MIN_FOREGROUND_COVERAGE,
+                            "min_local_coverage": MIN_LOCAL_COVERAGE,
+                            "edge_tolerance_px": EDGE_TOLERANCE_PX,
+                        }
+                        if silhouettes is not None
+                        else {}
+                    ),
                 },
                 "crops_sha256": crops_digest,
                 "items": report,

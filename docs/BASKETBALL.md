@@ -74,6 +74,11 @@ the plan's version, situation, ball event and checksum as an asset.
   neckline, wide shoulder panels, contrasting piping and the number front and back, and
   knee-length shorts joined at the seat. A believable 3D cut matters for photorealistic
   repainting: image-edit models keep the silhouette they are given.
+- **Body proportions** (November 2026): torso, jersey, arms, shorts and thighs follow an
+  athletic body with a jersey that hangs about 4 % away from the torso. Repainted people
+  had been thinner than the earlier, bulkier figures, so their masks kept a halo of
+  background; the slimmer figures cover about 11 % fewer person pixels in the same
+  scene. The skeleton, poses and keypoints are unchanged.
 - **Referees and ball** (layout schema 1.2): each scene samples a referee kit (grey with
   black sleeves, orange, black with neon accents or black/white stripes, always with long
   black trousers) that differs from both team kits, and a ball design (classic orange,

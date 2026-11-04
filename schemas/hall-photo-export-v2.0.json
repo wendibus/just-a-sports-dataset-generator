@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hall photographic COCO export manifest v2.0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "format",
+    "images",
+    "annotations",
+    "labels",
+    "background_sha256",
+    "scene_groups",
+    "counts",
+    "gender_modes",
+    "ball_modes",
+    "shots",
+    "person_asset_ids_by_split",
+    "pilot_preview_only",
+    "limitations",
+    "rights",
+    "sport"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "format": {
+      "const": "hall-photo-coco"
+    },
+    "images": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "annotations": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "labels": {
+      "const": [
+        "ball",
+        "player",
+        "goalkeeper",
+        "referee",
+        "goal"
+      ]
+    },
+    "background_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "scene_groups": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "counts": {
+      "type": "object"
+    },
+    "gender_modes": {
+      "type": "object"
+    },
+    "ball_modes": {
+      "type": "object"
+    },
+    "shots": {
+      "type": "object"
+    },
+    "person_asset_ids_by_split": {
+      "type": "object"
+    },
+    "pilot_preview_only": {
+      "type": "boolean"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rights": {
+      "type": "string"
+    },
+    "sport": {
+      "const": "futsal"
+    }
+  }
+}

@@ -109,6 +109,7 @@ class CropExportTests(unittest.TestCase):
             layout = read_json(source / "scene-000000/layout.json")
             family = next(a for a in layout["athletes"] if a["instance_id"] == 10)["pose"]["family"]
             self.assertEqual(crop["pose_family"], family)
+            self.assertIsInstance(crop["kit"], str)  # plain colour words for prompts
             self.assertEqual(crop["crop_box_xyxy"], [2, 2, 47, 47])
             self.assertEqual(crop["scale"], 2.0)
             self.assertEqual(crop["keypoints"][1], [46.5, 46.5, 2])
@@ -163,6 +164,27 @@ class CropExportTests(unittest.TestCase):
         self.assertFalse(_isolated((20, 20, 70, 80), hidden, ids, [6]))
         ids.paste(6, (52, 30, 60, 70))  # a neighbour right next to the person
         self.assertFalse(_isolated((20, 20, 70, 80), visible, ids, [6]))
+
+    def test_kit_descriptions_name_colours(self):
+        from just_a_sports_dataset_generator.crops import _kit_description, color_name
+
+        self.assertEqual(color_name([0.9, 0.9, 0.88]), "white")
+        self.assertEqual(color_name([0.02, 0.02, 0.025]), "black")
+        self.assertIsNone(color_name("red"))
+        referee = {
+            "referee_kit": {
+                "shirt": [0.34, 0.36, 0.38],
+                "sleeves": [0.008, 0.008, 0.009],
+                "pattern": "plain",
+                "accent": None,
+                "lower": "trousers",
+                "lower_color": [0.006, 0.006, 0.007],
+            }
+        }
+        self.assertEqual(
+            _kit_description(referee),
+            "a plain grey short-sleeved shirt with black sleeves and black long trousers",
+        )
 
 
 if __name__ == "__main__":

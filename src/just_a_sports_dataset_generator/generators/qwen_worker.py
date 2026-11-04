@@ -17,12 +17,13 @@ import sys
 import time
 from pathlib import Path
 
-PROMPT_VERSION = 4
+PROMPT_VERSION = 5
 """2: tank-top jersey description, pose hint per pose family, colours taken from image 1.
 3: no "shoulder panels" (Qwen drew pads and wings), real-photo wording against the 3D look,
    pose skeleton optional, background outside the person blurred before generation.
 4: inpaint mode (default): repaint only inside the person's mask, starting from the render;
-   no lettering except the number (night run: invented team names, colours changed)."""
+   no lettering except the number (night run: invented team names, colours changed).
+5: kit colours named from the layout (``kit`` in crops.json), referee kit as planned."""
 JERSEY = (
     "a thin, loose sleeveless basketball jersey of lightweight fabric with simple round "
     "armholes, a scoop neckline and the number printed on the chest, and loose knee-length "
@@ -161,15 +162,26 @@ def set_condition_size(work):
 
 
 def inpaint_prompt(crop):
-    """Prompt for inpaint mode: the render already fixes pose, outline, camera and colours."""
+    """Prompt for inpaint mode: the render already fixes pose, outline, camera and colours.
+
+    ``kit`` from crops.json names the colours (night run at strength 0.9: white kits came
+    out black or blue and grey referee shirts became striped without it).
+    """
     referee = crop.get("label") == "referee"
     who = "basketball referee" if referee else "basketball player"
-    kit = (
-        REFEREE_KIT
-        if referee
-        else "a sleeveless basketball jersey and shorts in exactly the colours of the figure, "
-        "with the same number and no other lettering or logos"
-    )
+    named = crop.get("kit")
+    if referee:
+        kit = named or REFEREE_KIT
+    elif named:
+        kit = (
+            f"a {named} sleeveless basketball jersey and {named} shorts, exactly the colour of "
+            "the figure, with the same number and no other lettering or logos"
+        )
+    else:
+        kit = (
+            "a sleeveless basketball jersey and shorts in exactly the colours of the figure, "
+            "with the same number and no other lettering or logos"
+        )
     hint = POSE_HINTS.get(crop.get("pose_family") or "")
     pose = f", {hint}" if hint else ""
     return (

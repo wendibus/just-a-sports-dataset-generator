@@ -4,6 +4,16 @@ Cross-platform, open-source generator for photorealistic synthetic sports datase
 
 > Project status: early implementation. Version 0.4 adds local **3D basketball scenes in Blender 5.x**: a court, ten procedural athletes, one or two referees, ball, hoops, lighting, and visible-pixel labels from the same render. Each scene varies the game situation, poses, ball state, ball design, referee kit, hall, light and motion between frames; stands stay empty. The Mac starter offers quality selection, a local progress page, and RGB/mask previews. The figures are procedural and visibly synthetic; photorealism and training benefit are **not yet validated**. COCO handoff is tested through Reco Trainer's actual importer and RF-DETR training-data preparation.
 
+## Photographic hall batches
+
+Local basketball and experimental [Futsal hall batches](docs/FUTSAL_HALL.md) compose
+Qwen/BiRefNet people with the supplied hall photograph. Futsal supports an exact
+10,009-image plan, goalkeeper/referee labels, standing goal meshes, varied balls
+and visible-pixel COCO masks for RF-DETR. The prepared local description embeds
+the user-supplied referee and ball reference charts. Training benefit remains
+unvalidated. This Futsal adapter was prioritized by explicit user request; a full
+football renderer remains planned. An experimental [outdoor football preparation](docs/FOOTBALL.md) now supplies a neutral procedural grass pitch, its own camera, goalkeeper/referee profiles and exact COCO plans. A local CPU photo-projection experiment has matching 3D goal masks, but its visual result was rejected by the user and is not approved for training; the user selected real photograph B, a ground-level amateur venue. Offline staging now records its source/license, crop, estimated scale and five detection boxes; fine goal masks and photo-aware compositing remain pending. No football photographic pilot or accuracy validation has been performed. See [basketball batch instructions](docs/HALL_NIGHT.md).
+
 ## Goals
 
 - Generate diverse, photorealistic sports scenes on Windows, macOS, and Linux.

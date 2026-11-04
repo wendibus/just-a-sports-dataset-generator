@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CPU football preparation v1.0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "sport": {
+      "const": "football"
+    },
+    "status": {
+      "const": "prepared_cpu_only"
+    },
+    "photographic_pilot_run": {
+      "const": false
+    },
+    "images_generated": {
+      "const": 0
+    },
+    "requested_images": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 100000
+    },
+    "scene_groups": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "labels": {
+      "const": [
+        "ball",
+        "player",
+        "goalkeeper",
+        "referee",
+        "goal"
+      ]
+    },
+    "person_assets_planned": {
+      "const": 336
+    },
+    "gender_modes": {
+      "type": "object",
+      "required": [
+        "men",
+        "women",
+        "mixed"
+      ],
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "ball_modes": {
+      "type": "object",
+      "required": [
+        "single",
+        "multi",
+        "none"
+      ],
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "sources": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "sport",
+    "status",
+    "photographic_pilot_run",
+    "images_generated",
+    "requested_images",
+    "scene_groups",
+    "labels",
+    "person_assets_planned",
+    "gender_modes",
+    "ball_modes",
+    "sources"
+  ],
+  "additionalProperties": false
+}

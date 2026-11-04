@@ -452,14 +452,19 @@ def hoop(sign, identity, white, steel):
 
 
 # Torso cross-sections (height, half-width x, half-depth y), athlete-local metres.
+# Half width and half depth of the torso by height (m). Slimmed in November 2026: the
+# repainted people were thinner than the 3D silhouette, so the mask kept a halo of
+# background; widths now follow an athletic body with a loose jersey on top.
 TORSO_RINGS = (
-    (0.90, 0.200, 0.130),
-    (1.08, 0.200, 0.135),
-    (1.34, 0.250, 0.150),
-    (1.48, 0.265, 0.145),
-    (1.53, 0.215, 0.125),
-    (1.58, 0.120, 0.095),
+    (0.90, 0.170, 0.115),
+    (1.08, 0.165, 0.115),
+    (1.34, 0.215, 0.132),
+    (1.48, 0.228, 0.128),
+    (1.53, 0.190, 0.112),
+    (1.58, 0.110, 0.088),
 )
+LOOSE = 1.04
+"""How far a jersey hangs away from the torso at the chest (it hangs a bit more at the hem)."""
 
 
 def torso_radius(z):
@@ -540,7 +545,7 @@ def jersey_mesh(mat, identity, root, drop, skin=None, trim=None, armholes=True):
         theta = c * math.tau / columns
         z = hem + (jersey_top(theta, armholes) - hem) * r / (rows - 1)
         rx, ry = torso_radius(z)
-        loose = 1.06 + 0.04 * (1 - r / (rows - 1))  # fabric hangs slightly away at the hem
+        loose = LOOSE + 0.03 * (1 - r / (rows - 1))  # fabric hangs slightly away at the hem
         return (math.cos(theta) * rx * loose, math.sin(theta) * ry * loose, z - drop)
 
     obj = surface("Jersey", columns, rows, shirt, mat, identity, root)
@@ -661,7 +666,7 @@ def athlete(plan):
     trim = white if team < 2 else dark
     jersey_mesh(kit, identity, upper, drop, skin=skin, trim=trim, armholes=team < 2)
     # Shorts body over the hips: connects both legs like real loose shorts.
-    oval("Shorts seat", (0, 0.01, 0.9 - drop), (0.215, 0.15, 0.17), shorts, identity, upper)
+    oval("Shorts seat", (0, 0.01, 0.9 - drop), (0.18, 0.13, 0.15), shorts, identity, upper)
     neck = j["neck"]
     oval("Neck", (neck[0], neck[1], neck[2] + 0.04), (0.075, 0.075, 0.11), skin, identity, upper)
     head = j["head"]
@@ -691,17 +696,19 @@ def athlete(plan):
             return lambda joints: joints[name]
 
         between(
-            limb("Shorts leg", hip, split(j), 0.15, 0.14, shorts, identity, root), get(hip_n), split
+            limb("Shorts leg", hip, split(j), 0.115, 0.105, shorts, identity, root),
+            get(hip_n),
+            split,
         )
         wide = 1.12 if trousers else 1.0  # trousers hang loosely around thigh and calf
         between(
-            limb("Thigh", split(j), knee, 0.105 * wide, 0.080 * wide, leg, identity, root),
+            limb("Thigh", split(j), knee, 0.09 * wide, 0.07 * wide, leg, identity, root),
             split,
             get(knee_n),
         )
-        at_joint(oval("Knee", knee, (0.078 * wide,) * 2 + (0.082,), leg, identity, root), knee_n)
+        at_joint(oval("Knee", knee, (0.066 * wide,) * 2 + (0.072,), leg, identity, root), knee_n)
         between(
-            limb("Calf", knee, ankle, 0.075 * wide, 0.045 * wide, leg, identity, root),
+            limb("Calf", knee, ankle, 0.066 * wide, 0.042 * wide, leg, identity, root),
             get(knee_n),
             get(ankle_n),
         )
@@ -728,10 +735,10 @@ def athlete(plan):
         shoulder, elbow, wrist = j[shoulder_n], j[elbow_n], j[wrist_n]
         cover = skin if team < 2 else sleeves  # a referee's shoulders are inside the shirt
         at_joint(
-            oval("Shoulder", shoulder, (0.098, 0.098, 0.11), cover, identity, root), shoulder_n
+            oval("Shoulder", shoulder, (0.072, 0.072, 0.08), cover, identity, root), shoulder_n
         )
         between(
-            limb("Upper arm", shoulder, elbow, 0.083, 0.061, skin, identity, root),
+            limb("Upper arm", shoulder, elbow, 0.064, 0.05, skin, identity, root),
             get(shoulder_n),
             get(elbow_n),
         )
@@ -740,11 +747,11 @@ def athlete(plan):
             def sleeve_end(joints, shoulder_n=shoulder_n, elbow_n=elbow_n):
                 return along(joints[shoulder_n], joints[elbow_n], 0.5)
 
-            sleeve = limb("Sleeve", shoulder, sleeve_end(j), 0.1, 0.085, sleeves, identity, root)
+            sleeve = limb("Sleeve", shoulder, sleeve_end(j), 0.08, 0.07, sleeves, identity, root)
             between(sleeve, get(shoulder_n), sleeve_end)
-        at_joint(oval("Elbow", elbow, (0.061, 0.061, 0.061), skin, identity, root), elbow_n)
+        at_joint(oval("Elbow", elbow, (0.05, 0.05, 0.05), skin, identity, root), elbow_n)
         between(
-            limb("Forearm", elbow, wrist, 0.061, 0.035, skin, identity, root),
+            limb("Forearm", elbow, wrist, 0.05, 0.034, skin, identity, root),
             get(elbow_n),
             get(wrist_n),
         )
@@ -758,34 +765,42 @@ def athlete(plan):
         hand.scale = (1, 0.6, 1)
         between(hand, get(wrist_n), fingertips)
     torso_z = 1.20 - drop
+    # Lettering and piping sit on the jersey surface (LOOSE plus a few millimetres).
+    chest = torso_radius(1.20)[1] * (LOOSE + 0.015) + 0.004
     if team < 2:
         text_object(
-            str(plan["number"]), (0, -0.168, torso_z), 0.19, white, identity=identity, parent=upper
+            str(plan["number"]), (0, -chest, torso_z), 0.17, white, identity=identity, parent=upper
         )
         text_object(
             str(plan["number"]),
-            (0, 0.168, torso_z),
-            0.21,
+            (0, chest, torso_z),
+            0.19,
             white,
             rotation=(math.pi / 2, 0, math.pi),
             identity=identity,
             parent=upper,
         )
         for side in (-1, 1):
-            trim = [(side * 0.203, 0, 0.96 - drop), (side * 0.25, 0, 1.44 - drop)]
+            trim = [
+                (side * (torso_radius(z)[0] * (LOOSE + 0.02) + 0.003), 0, z - drop)
+                for z in (0.96, 1.2, 1.44)
+            ]
             line("Uniform trim", trim, white, 0.012, identity, upper)
     elif stripes:
         for side in (-1, 1):  # front and back: referee shirts are striped all around
-            for x in (-0.15, -0.075, 0, 0.075, 0.15):
+            for x in (-0.13, -0.065, 0, 0.065, 0.13):
                 # On the shirt's surface (the shirt hangs 6-10 % away from the torso).
                 stripe = [
-                    (x, side * (torso_radius(z)[1] * 1.1 + 0.004), z - drop)
+                    (x, side * (torso_radius(z)[1] * (LOOSE + 0.03) + 0.004), z - drop)
                     for z in (1.0, 1.15, 1.3, 1.44)
                 ]
                 line("Referee stripe", stripe, stripe_mat, 0.014, identity, upper)
     elif referee and referee.get("accent"):
         for side in (-1, 1):  # accent piping down the shirt's sides
-            piping = [(side * 0.215, 0, 0.98 - drop), (side * 0.26, 0, 1.42 - drop)]
+            piping = [
+                (side * (torso_radius(z)[0] * (LOOSE + 0.02) + 0.003), 0, z - drop)
+                for z in (0.98, 1.2, 1.42)
+            ]
             line("Referee piping", piping, stripe_mat, 0.02, identity, upper)
     RIGS[identity] = (upper, drop, updaters)
     SKELETONS[identity] = (root, {name: j[name] for name in OPENPOSE_18})
